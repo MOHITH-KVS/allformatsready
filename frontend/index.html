@@ -226,6 +226,10 @@
     .privacy-banner-text{font-size:.82rem;color:#14532D;line-height:1.55}
     .privacy-banner-text strong{font-weight:700}
 
+    /* DOCX notice in dropzone */
+    .docx-notice{margin-top:12px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:7px;padding:8px 12px;font-size:.74rem;color:#92400E;line-height:1.5}
+    .docx-notice strong{font-weight:700;color:#78350F}
+
     /* Portal presets */
     .preset-section{max-width:580px;margin:0 auto 0;padding:0 20px}
     .preset-label{font-size:.78rem;font-weight:700;color:var(--gray-600);margin-bottom:8px;display:flex;align-items:center;gap:6px}
@@ -291,14 +295,14 @@
 <div class="upload-wrap">
 <div class="card" id="uploadCard">
   <div class="drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.docx,.doc"/>
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif"/>
     <span class="drop-icon">📂</span>
     <div class="drop-title">Drop your document here or click to browse</div>
-    <div class="drop-sub">Any document or image — max 15MB</div>
+    <div class="drop-sub">PDF, JPG, PNG, WebP, BMP, GIF, TIFF — max 15MB</div>
     <div class="drop-formats">
       <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
       <span class="drop-fmt">WebP</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">BMP</span>
-      <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span><span class="drop-fmt">DOCX</span>
+      <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span>
     </div>
   </div>
 

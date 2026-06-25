@@ -10,19 +10,14 @@ from fastapi.responses import JSONResponse
 
 fitz_mod = None
 Image_cls = None
-DocxDocument = None
-
 def load_libs():
-    global fitz_mod, Image_cls, DocxDocument
+    global fitz_mod, Image_cls
     if fitz_mod is None:
         import fitz as _fitz
         fitz_mod = _fitz
     if Image_cls is None:
         from PIL import Image as _Image
         Image_cls = _Image
-    if DocxDocument is None:
-        from docx import Document as _Doc
-        DocxDocument = _Doc
 
 @asynccontextmanager
 async def lifespan(app):
@@ -184,20 +179,14 @@ async def convert(file: UploadFile = File(...)):
     is_docx = ext in ["docx","doc"] or "wordprocessing" in (file.content_type or "")
     is_image = not is_pdf and not is_docx
 
-    # ── DOCX input → convert to PDF via fitz ──
+    # DOCX input not supported — requires LibreOffice (not available on free tier)
     if is_docx:
-        try:
-            doc = fitz_mod.open(stream=file_bytes, filetype="docx")
-            buf = io.BytesIO()
-            doc.save(buf)
-            doc.close()
-            file_bytes = buf.getvalue()
-            is_pdf = True
-            is_docx = False
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Could not process DOCX: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="DOCX upload is not supported yet. Please convert your Word document to PDF first, then upload the PDF."
+        )
 
-    if is_pdf:
+        if is_pdf:
         doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
         total_pages = len(doc)
         text = "".join(p.get_text() for p in doc)
