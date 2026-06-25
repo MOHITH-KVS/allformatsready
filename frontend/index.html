@@ -1,701 +1,492 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- ── SEO Meta Tags ── -->
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AllFormatsReady – Upload Once, Get All Formats | Aadhaar, PAN, PDF Converter India</title>
-  <meta name="description" content="Upload your Aadhaar, PAN card or any document once and instantly get PDF (compressed), JPG, PNG, WebP in all sizes under 100KB, 200KB, 500KB. Free online tool for Indian government forms, bank KYC, EPFO, UIDAI." />
-  <meta name="keywords" content="compress aadhaar pdf, aadhaar card jpg under 200kb, pan card pdf to jpg, compress document for bank kyc, pdf to jpg india, aadhaar pdf compress online, epfo document upload, uidai document format" />
-  <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://allformatsready.vercel.app/" />
-
-  <!-- ── Open Graph (WhatsApp / social sharing) ── -->
-  <meta property="og:title" content="AllFormatsReady – Upload Once, Get Every Format" />
-  <meta property="og:description" content="Free Indian document converter. Upload Aadhaar, PAN or any file – get JPG, PNG, WebP, compressed PDF in all sizes instantly." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://allformatsready.vercel.app/" />
-
-  <!-- ── Schema.org structured data (Google rich results) ── -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "AllFormatsReady",
-    "description": "Upload your document once and get all formats instantly — PDF compressed, JPG, PNG, WebP in sizes under 100KB, 200KB, 500KB. Built for Indian government forms and KYC.",
-    "url": "https://allformatsready.vercel.app",
-    "applicationCategory": "UtilitiesApplication",
-    "operatingSystem": "Any",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
-    "inLanguage": "en-IN"
-  }
-  </script>
+  <meta name="description" content="Upload your Aadhaar, PAN card or any document once and instantly get PDF, JPG, PNG, WebP in all sizes. Free online tool for Indian government forms, bank KYC, EPFO, UIDAI."/>
+  <meta name="keywords" content="compress aadhaar pdf, aadhaar card jpg under 200kb, pan card pdf to jpg, compress document for bank kyc, pdf to jpg india, aadhaar pdf compress online, epfo document upload, uidai document format"/>
+  <meta name="robots" content="index, follow"/>
+  <link rel="canonical" href="https://allformatsready.vercel.app/"/>
+  <meta property="og:title" content="AllFormatsReady – Upload Once, Get Every Format"/>
+  <meta property="og:description" content="Free Indian document converter. Upload Aadhaar, PAN or any file – get JPG, PNG, WebP, compressed PDF in all sizes instantly."/>
+  <meta property="og:type" content="website"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AllFormatsReady","description":"Upload your document once and get all formats instantly.","url":"https://allformatsready.vercel.app","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}}</script>
 
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --brand:#2563EB;--brand-dark:#1D4ED8;--brand-light:#EFF6FF;
+      --success:#16A34A;--success-light:#F0FDF4;
+      --danger:#DC2626;--warn:#D97706;
+      --gray-50:#F9FAFB;--gray-100:#F3F4F6;--gray-200:#E5E7EB;
+      --gray-400:#9CA3AF;--gray-500:#6B7280;--gray-600:#4B5563;
+      --gray-800:#1F2937;--gray-900:#111827;
+      --radius:12px;--shadow:0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-50);color:var(--gray-800);min-height:100vh;line-height:1.6}
 
-    :root {
-      --brand: #2563EB;
-      --brand-dark: #1D4ED8;
-      --brand-light: #EFF6FF;
-      --success: #16A34A;
-      --success-light: #F0FDF4;
-      --danger: #DC2626;
-      --gray-50: #F9FAFB;
-      --gray-100: #F3F4F6;
-      --gray-200: #E5E7EB;
-      --gray-400: #9CA3AF;
-      --gray-600: #4B5563;
-      --gray-800: #1F2937;
-      --gray-900: #111827;
-      --radius: 12px;
-      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
-    }
+    /* Header */
+    header{background:#fff;border-bottom:1px solid var(--gray-200);padding:14px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+    .logo{font-size:1.15rem;font-weight:800;color:var(--brand);letter-spacing:-0.5px}
+    .logo span{color:var(--gray-900)}
+    .badge{background:var(--brand-light);color:var(--brand);font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--gray-50);
-      color: var(--gray-800);
-      min-height: 100vh;
-      line-height: 1.6;
-    }
+    /* Hero */
+    .hero{text-align:center;padding:44px 20px 28px;max-width:620px;margin:0 auto}
+    .hero h1{font-size:clamp(1.5rem,5vw,2.2rem);font-weight:800;color:var(--gray-900);line-height:1.2;margin-bottom:12px;letter-spacing:-.5px}
+    .hero h1 em{font-style:normal;color:var(--brand)}
+    .hero p{color:var(--gray-600);font-size:.95rem;max-width:460px;margin:0 auto 22px}
+    .pills{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:32px}
+    .pill{background:#fff;border:1px solid var(--gray-200);border-radius:20px;padding:4px 12px;font-size:.78rem;color:var(--gray-600);white-space:nowrap}
+    .pill strong{color:var(--gray-900)}
 
-    /* ── Header ── */
-    header {
-      background: #fff;
-      border-bottom: 1px solid var(--gray-200);
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .logo {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: var(--brand);
-      letter-spacing: -0.5px;
-    }
-    .logo span { color: var(--gray-800); }
-    .badge {
-      background: var(--brand-light);
-      color: var(--brand);
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 20px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+    /* Upload card */
+    .card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);max-width:560px;margin:0 auto 28px;overflow:hidden}
+    .drop-zone{border:2px dashed var(--gray-200);border-radius:10px;margin:22px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+    .drop-zone.dragover{border-color:var(--brand);background:var(--brand-light)}
+    .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .drop-icon{font-size:2.2rem;margin-bottom:10px;display:block}
+    .drop-title{font-size:.95rem;font-weight:600;color:var(--gray-800);margin-bottom:5px}
+    .drop-sub{font-size:.78rem;color:var(--gray-400)}
+    .drop-formats{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:10px}
+    .drop-fmt{background:var(--gray-100);border-radius:4px;padding:2px 7px;font-size:.7rem;font-weight:600;color:var(--gray-600)}
 
-    /* ── Hero ── */
-    .hero {
-      text-align: center;
-      padding: 48px 20px 32px;
-      max-width: 640px;
-      margin: 0 auto;
-    }
-    .hero h1 {
-      font-size: clamp(1.6rem, 5vw, 2.4rem);
-      font-weight: 800;
-      color: var(--gray-900);
-      line-height: 1.2;
-      margin-bottom: 14px;
-      letter-spacing: -0.5px;
-    }
-    .hero h1 em {
-      font-style: normal;
-      color: var(--brand);
-    }
-    .hero p {
-      color: var(--gray-600);
-      font-size: 1rem;
-      max-width: 480px;
-      margin: 0 auto 28px;
-    }
+    /* File preview */
+    .file-preview{display:none;align-items:center;gap:12px;margin:0 22px 0;padding:12px 14px;background:var(--gray-50);border-radius:8px;border:1px solid var(--gray-200)}
+    .file-preview.show{display:flex}
+    .file-icon{font-size:1.5rem;flex-shrink:0}
+    .file-info{flex:1;min-width:0}
+    .file-name{font-size:.85rem;font-weight:600;color:var(--gray-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .file-size{font-size:.75rem;color:var(--gray-400)}
+    .file-remove{background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:1rem;padding:4px;flex-shrink:0}
+    .file-remove:hover{color:var(--danger)}
 
-    /* ── Use-case pills ── */
-    .pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-bottom: 36px;
-    }
-    .pill {
-      background: #fff;
-      border: 1px solid var(--gray-200);
-      border-radius: 20px;
-      padding: 5px 14px;
-      font-size: 0.8rem;
-      color: var(--gray-600);
-      white-space: nowrap;
-    }
-    .pill strong { color: var(--gray-900); }
+    /* Sensitive badge */
+    .sensitive-notice{display:none;margin:10px 22px 0;padding:10px 14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;font-size:.8rem;color:#92400E;gap:8px;align-items:flex-start}
+    .sensitive-notice.show{display:flex}
 
-    /* ── Upload card ── */
-    .card {
-      background: #fff;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      max-width: 580px;
-      margin: 0 auto 32px;
-      overflow: hidden;
-    }
+    /* Convert btn */
+    .btn-convert{display:block;width:calc(100% - 44px);margin:14px 22px 22px;padding:14px;background:var(--brand);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:background .2s,transform .1s;letter-spacing:.2px}
+    .btn-convert:hover:not(:disabled){background:var(--brand-dark);transform:translateY(-1px)}
+    .btn-convert:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed;transform:none}
 
-    .drop-zone {
-      border: 2px dashed var(--gray-200);
-      border-radius: 10px;
-      margin: 24px;
-      padding: 40px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color .2s, background .2s;
-      position: relative;
-    }
-    .drop-zone.dragover {
-      border-color: var(--brand);
-      background: var(--brand-light);
-    }
-    .drop-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-    .drop-icon {
-      font-size: 2.5rem;
-      margin-bottom: 12px;
-      display: block;
-    }
-    .drop-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--gray-800);
-      margin-bottom: 6px;
-    }
-    .drop-sub {
-      font-size: 0.82rem;
-      color: var(--gray-400);
-    }
+    /* Progress */
+    .progress-wrap{display:none;margin:0 22px 18px}
+    .progress-wrap.show{display:block}
+    .progress-bar-bg{background:var(--gray-100);border-radius:20px;height:7px;overflow:hidden;margin-bottom:8px}
+    .progress-bar-fill{height:100%;background:var(--brand);border-radius:20px;width:0%;transition:width .4s ease}
+    .progress-label{font-size:.8rem;color:var(--gray-600);text-align:center}
 
-    /* ── File preview ── */
-    .file-preview {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      margin: 0 24px 0;
-      padding: 14px 16px;
-      background: var(--gray-50);
-      border-radius: 8px;
-      border: 1px solid var(--gray-200);
-    }
-    .file-preview.show { display: flex; }
-    .file-icon { font-size: 1.6rem; flex-shrink: 0; }
-    .file-name { font-size: 0.88rem; font-weight: 500; color: var(--gray-800); word-break: break-all; }
-    .file-size { font-size: 0.78rem; color: var(--gray-400); }
-    .file-remove {
-      margin-left: auto;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--gray-400);
-      font-size: 1.1rem;
-      padding: 4px;
-      flex-shrink: 0;
-    }
-    .file-remove:hover { color: var(--danger); }
+    /* Error */
+    .error-wrap{display:none;margin:0 22px 16px;padding:12px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;color:var(--danger);font-size:.85rem}
+    .error-wrap.show{display:block}
 
-    /* ── Convert button ── */
-    .btn-convert {
-      display: block;
-      width: calc(100% - 48px);
-      margin: 16px 24px 24px;
-      padding: 15px;
-      background: var(--brand);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background .2s, transform .1s;
-      letter-spacing: 0.2px;
-    }
-    .btn-convert:hover:not(:disabled) { background: var(--brand-dark); transform: translateY(-1px); }
-    .btn-convert:disabled { background: var(--gray-200); color: var(--gray-400); cursor: not-allowed; transform: none; }
+    /* Privacy */
+    .privacy{text-align:center;font-size:.75rem;color:var(--gray-400);padding:0 22px 20px}
+    .privacy span{color:var(--success);font-weight:600}
 
-    /* ── Progress ── */
-    .progress-wrap {
-      display: none;
-      margin: 0 24px 20px;
-    }
-    .progress-wrap.show { display: block; }
-    .progress-bar-bg {
-      background: var(--gray-100);
-      border-radius: 20px;
-      height: 8px;
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--brand);
-      border-radius: 20px;
-      width: 0%;
-      transition: width .4s ease;
-    }
-    .progress-label {
-      font-size: 0.82rem;
-      color: var(--gray-600);
-      text-align: center;
-    }
+    /* Results section */
+    .results{max-width:900px;margin:0 auto 48px;padding:0 20px}
+    .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:gap}
+    .results-title{font-size:1.05rem;font-weight:700;color:var(--gray-900)}
+    .results-count{font-size:.82rem;color:var(--gray-500)}
+    .btn-zip{background:var(--gray-800);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+    .btn-zip:hover{background:var(--gray-900)}
 
-    /* ── Success ── */
-    .success-wrap {
-      display: none;
-      margin: 0 24px 24px;
-      padding: 20px;
-      background: var(--success-light);
-      border: 1px solid #BBF7D0;
-      border-radius: 10px;
-      text-align: center;
-    }
-    .success-wrap.show { display: block; }
-    .success-icon { font-size: 2rem; margin-bottom: 8px; }
-    .success-title { font-weight: 700; color: var(--success); font-size: 1rem; margin-bottom: 4px; }
-    .success-sub { font-size: 0.82rem; color: var(--gray-600); margin-bottom: 16px; }
-    .btn-download {
-      display: inline-block;
-      padding: 12px 28px;
-      background: var(--success);
-      color: #fff;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      text-decoration: none;
-      cursor: pointer;
-      border: none;
-    }
-    .btn-download:hover { background: #15803D; }
-    .btn-again {
-      display: block;
-      margin-top: 10px;
-      background: none;
-      border: none;
-      color: var(--brand);
-      font-size: 0.85rem;
-      cursor: pointer;
-      text-decoration: underline;
-    }
+    /* Category tabs */
+    .cat-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+    .cat-tab{background:#fff;border:1px solid var(--gray-200);border-radius:20px;padding:5px 14px;font-size:.8rem;font-weight:600;color:var(--gray-600);cursor:pointer;transition:all .15s}
+    .cat-tab.active{background:var(--brand);border-color:var(--brand);color:#fff}
 
-    /* ── Error ── */
-    .error-wrap {
-      display: none;
-      margin: 0 24px 20px;
-      padding: 14px 16px;
-      background: #FEF2F2;
-      border: 1px solid #FECACA;
-      border-radius: 8px;
-      color: var(--danger);
-      font-size: 0.88rem;
-    }
-    .error-wrap.show { display: block; }
+    /* File cards grid */
+    .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+    .file-card{background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .15s,border-color .15s}
+    .file-card:hover{box-shadow:var(--shadow);border-color:var(--gray-300)}
+    .file-card.masked{border-color:#FED7AA;background:#FFFBF5}
+    .card-top{display:flex;align-items:center;gap:10px}
+    .card-fmt-badge{font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+    .fmt-jpg{background:#FEF3C7;color:#92400E}
+    .fmt-png{background:#ECFDF5;color:#065F46}
+    .fmt-webp{background:#EDE9FE;color:#4C1D95}
+    .fmt-pdf{background:#FEE2E2;color:#991B1B}
+    .card-label{font-size:.82rem;font-weight:600;color:var(--gray-800);line-height:1.3}
+    .card-size{font-size:.75rem;color:var(--gray-500);display:flex;align-items:center;gap:4px}
+    .size-bar-bg{background:var(--gray-100);border-radius:4px;height:4px;flex:1}
+    .size-bar-fill{height:100%;border-radius:4px;background:var(--brand);transition:width .3s}
+    .masked-tag{font-size:.68rem;background:#FED7AA;color:#92400E;padding:2px 7px;border-radius:10px;font-weight:600;align-self:flex-start}
+    .btn-dl{display:block;width:100%;padding:9px;background:var(--brand-light);color:var(--brand);border:1px solid #BFDBFE;border-radius:7px;font-size:.8rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;transition:background .15s}
+    .btn-dl:hover{background:#DBEAFE}
 
-    /* ── Privacy notice ── */
-    .privacy {
-      text-align: center;
-      font-size: 0.78rem;
-      color: var(--gray-400);
-      padding: 0 24px 24px;
-    }
-    .privacy span { color: var(--success); font-weight: 600; }
+    /* FAQ */
+    .faq{max-width:560px;margin:0 auto 48px;padding:0 20px}
+    .faq h2{font-size:1rem;font-weight:700;color:var(--gray-900);margin-bottom:14px}
+    .faq-item{border-bottom:1px solid var(--gray-100);padding:12px 0}
+    .faq-item:last-child{border-bottom:none}
+    .faq-q{font-weight:600;color:var(--gray-800);font-size:.88rem;margin-bottom:5px}
+    .faq-a{color:var(--gray-600);font-size:.82rem;line-height:1.6}
 
-    /* ── What you get ── */
-    .outputs-section {
-      max-width: 580px;
-      margin: 0 auto 40px;
-      padding: 0 20px;
-    }
-    .outputs-section h2 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--gray-800);
-      margin-bottom: 14px;
-      text-align: center;
-    }
-    .outputs-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 10px;
-    }
-    .output-item {
-      background: #fff;
-      border: 1px solid var(--gray-200);
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 0.82rem;
-    }
-    .output-item .fmt { font-weight: 700; color: var(--brand); font-size: 0.9rem; margin-bottom: 4px; }
-    .output-item .desc { color: var(--gray-600); }
+    footer{text-align:center;padding:22px 20px;font-size:.76rem;color:var(--gray-400);border-top:1px solid var(--gray-200);background:#fff}
 
-    /* ── SEO FAQ section ── */
-    .faq {
-      max-width: 580px;
-      margin: 0 auto 48px;
-      padding: 0 20px;
-    }
-    .faq h2 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--gray-900);
-      margin-bottom: 16px;
-    }
-    .faq-item {
-      border-bottom: 1px solid var(--gray-100);
-      padding: 14px 0;
-    }
-    .faq-item:last-child { border-bottom: none; }
-    .faq-q {
-      font-weight: 600;
-      color: var(--gray-800);
-      font-size: 0.9rem;
-      margin-bottom: 6px;
-    }
-    .faq-a {
-      color: var(--gray-600);
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-
-    /* ── Footer ── */
-    footer {
-      text-align: center;
-      padding: 24px 20px;
-      font-size: 0.78rem;
-      color: var(--gray-400);
-      border-top: 1px solid var(--gray-200);
-      background: #fff;
-    }
-
-    @media (max-width: 480px) {
-      .hero { padding: 32px 16px 24px; }
-      .outputs-grid { grid-template-columns: 1fr 1fr; }
+    @media(max-width:480px){
+      .hero{padding:28px 16px 20px}
+      .cards-grid{grid-template-columns:1fr 1fr}
+      .results-header{flex-direction:column;align-items:flex-start;gap:10px}
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="logo">All<span>Formats</span>Ready</div>
-    <div class="badge">Free</div>
-  </header>
+<header>
+  <div class="logo">All<span>Formats</span>Ready</div>
+  <div class="badge">Free</div>
+</header>
 
-  <!-- ── Hero ── -->
-  <section class="hero">
-    <h1>Upload once.<br><em>Every format, instantly.</em></h1>
-    <p>Stop converting documents one by one. Get PDF, JPG, PNG, WebP — in every size — in a single click.</p>
-    <div class="pills">
-      <div class="pill"><strong>Aadhaar</strong> for UIDAI</div>
-      <div class="pill"><strong>PAN card</strong> for bank KYC</div>
-      <div class="pill"><strong>EPFO</strong> uploads</div>
-      <div class="pill"><strong>College</strong> admissions</div>
-      <div class="pill">Under <strong>200KB</strong> JPG</div>
-      <div class="pill"><strong>Masked</strong> Aadhaar PDF</div>
+<section class="hero">
+  <h1>Upload once.<br><em>Every format, instantly.</em></h1>
+  <p>Stop converting documents one by one. Get PDF, JPG, PNG, WebP — in every size — download only what you need.</p>
+  <div class="pills">
+    <div class="pill"><strong>Aadhaar</strong> for UIDAI</div>
+    <div class="pill"><strong>PAN card</strong> for bank KYC</div>
+    <div class="pill"><strong>EPFO</strong> uploads</div>
+    <div class="pill"><strong>College</strong> admissions</div>
+    <div class="pill">Under <strong>200KB</strong> JPG</div>
+    <div class="pill"><strong>Masked</strong> Aadhaar PDF</div>
+  </div>
+</section>
+
+<!-- Upload card -->
+<div class="card" id="uploadCard">
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.docx,.doc"/>
+    <span class="drop-icon">📄</span>
+    <div class="drop-title">Drop your document here or click to browse</div>
+    <div class="drop-sub">Any document or image format supported</div>
+    <div class="drop-formats">
+      <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
+      <span class="drop-fmt">WebP</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">BMP</span>
+      <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span>
     </div>
-  </section>
-
-  <!-- ── Upload card ── -->
-  <div class="card">
-
-    <!-- Drop zone -->
-    <div class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp" />
-      <span class="drop-icon">📄</span>
-      <div class="drop-title">Drop your document here</div>
-      <div class="drop-sub">PDF, JPG, PNG, WebP — max 10MB</div>
-    </div>
-
-    <!-- File preview -->
-    <div class="file-preview" id="filePreview">
-      <span class="file-icon" id="fileIcon">📄</span>
-      <div>
-        <div class="file-name" id="fileName"></div>
-        <div class="file-size" id="fileSize"></div>
-      </div>
-      <button class="file-remove" id="fileRemove" title="Remove">✕</button>
-    </div>
-
-    <!-- Error -->
-    <div class="error-wrap" id="errorWrap"></div>
-
-    <!-- Progress -->
-    <div class="progress-wrap" id="progressWrap">
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressFill"></div>
-      </div>
-      <div class="progress-label" id="progressLabel">Preparing your formats…</div>
-    </div>
-
-    <!-- Success -->
-    <div class="success-wrap" id="successWrap">
-      <div class="success-icon">✅</div>
-      <div class="success-title">All formats ready!</div>
-      <div class="success-sub" id="successSub">Your ZIP contains every format and size you'll ever need.</div>
-      <a class="btn-download" id="downloadBtn">⬇ Download ZIP</a>
-      <button class="btn-again" id="btnAgain">Convert another file</button>
-    </div>
-
-    <!-- Convert button -->
-    <button class="btn-convert" id="btnConvert" disabled>
-      Generate All Formats →
-    </button>
-
-    <!-- Privacy -->
-    <div class="privacy">
-      🔒 <span>Your file is deleted from our server within 60 seconds.</span> We never store your documents.
-    </div>
-
   </div>
 
-  <!-- ── What you get ── -->
-  <section class="outputs-section">
-    <h2>What's inside your ZIP</h2>
-    <div class="outputs-grid">
-      <div class="output-item">
-        <div class="fmt">PDF</div>
-        <div class="desc">Compressed, ready to email or upload</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">Masked PDF</div>
-        <div class="desc">Aadhaar with first 8 digits hidden</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">JPG × 3</div>
-        <div class="desc">High, medium, low quality</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">JPG under 100KB</div>
-        <div class="desc">For strict portal limits</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">JPG under 200KB</div>
-        <div class="desc">Most common bank KYC limit</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">JPG under 500KB</div>
-        <div class="desc">College / government forms</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">PNG</div>
-        <div class="desc">Lossless, highest quality</div>
-      </div>
-      <div class="output-item">
-        <div class="fmt">WebP × 2</div>
-        <div class="desc">Smallest file size for web</div>
-      </div>
+  <div class="file-preview" id="filePreview">
+    <span class="file-icon" id="fileIcon">📄</span>
+    <div class="file-info">
+      <div class="file-name" id="fileName"></div>
+      <div class="file-size" id="fileSize"></div>
     </div>
-  </section>
+    <button class="file-remove" id="fileRemove" title="Remove">✕</button>
+  </div>
 
-  <!-- ── SEO FAQ ── -->
-  <section class="faq">
-    <h2>Frequently asked questions</h2>
-    <div class="faq-item">
-      <div class="faq-q">How do I compress Aadhaar PDF to under 200KB for bank KYC?</div>
-      <div class="faq-a">Upload your Aadhaar PDF to AllFormatsReady. Your ZIP will include a JPG under 200KB and a compressed PDF — both ready for any bank KYC portal.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">How to convert Aadhaar card PDF to JPG online free?</div>
-      <div class="faq-a">Simply upload your Aadhaar PDF above. AllFormatsReady converts it to JPG in multiple sizes automatically — no sign-up needed, completely free.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">What is a masked Aadhaar and why do portals ask for it?</div>
-      <div class="faq-a">Masked Aadhaar hides the first 8 digits of your 12-digit Aadhaar number, showing only the last 4. UIDAI recommends sharing masked Aadhaar to protect your identity. AllFormatsReady generates it automatically.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">Which formats does EPFO accept for document upload?</div>
-      <div class="faq-a">EPFO typically accepts PDF and JPG under 500KB. AllFormatsReady includes both formats with correct sizes in your download ZIP.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">Is my Aadhaar card safe to upload here?</div>
-      <div class="faq-a">Yes. Your file is processed instantly on our server and deleted within 60 seconds. We never store, read, or share your documents. Processing happens in memory only.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">Do I need to create an account?</div>
-      <div class="faq-a">No account, no sign-up, no email needed. Upload, convert, download. That's it.</div>
-    </div>
-  </section>
+  <div class="sensitive-notice" id="sensitiveNotice">
+    <span>🔐</span>
+    <div>Aadhaar or PAN detected — we'll generate a <strong>Masked version</strong> automatically. Your file is deleted within 60 seconds.</div>
+  </div>
 
-  <footer>
-    <strong>AllFormatsReady</strong> — Free document converter for Indian government forms & KYC<br>
-    Built for Aadhaar · PAN · Passport · Any document &nbsp;|&nbsp; 100% Free &nbsp;|&nbsp; No sign-up
-  </footer>
+  <div class="error-wrap" id="errorWrap"></div>
 
-  <script>
-    // ── Config ──
-    // Change this to your Render backend URL after deploying
-    const API_URL = "https://allformatsready.onrender.com";
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">Preparing your formats…</div>
+  </div>
 
-    // ── State ──
-    let selectedFile = null;
-    let downloadUrl = null;
+  <button class="btn-convert" id="btnConvert" disabled>Generate All Formats →</button>
 
-    // ── Elements ──
-    const dropZone    = document.getElementById("dropZone");
-    const fileInput   = document.getElementById("fileInput");
-    const filePreview = document.getElementById("filePreview");
-    const fileIcon    = document.getElementById("fileIcon");
-    const fileName    = document.getElementById("fileName");
-    const fileSize    = document.getElementById("fileSize");
-    const fileRemove  = document.getElementById("fileRemove");
-    const btnConvert  = document.getElementById("btnConvert");
-    const progressWrap= document.getElementById("progressWrap");
-    const progressFill= document.getElementById("progressFill");
-    const progressLabel=document.getElementById("progressLabel");
-    const successWrap = document.getElementById("successWrap");
-    const successSub  = document.getElementById("successSub");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const btnAgain    = document.getElementById("btnAgain");
-    const errorWrap   = document.getElementById("errorWrap");
+  <div class="privacy">🔒 <span>Files deleted from server within 60 seconds.</span> No account needed. 100% free.</div>
+</div>
 
-    // ── Helpers ──
-    function formatBytes(bytes) {
-      if (bytes < 1024) return bytes + " B";
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+<!-- Results -->
+<div class="results" id="resultsSection" style="display:none">
+  <div class="results-header">
+    <div>
+      <div class="results-title">Your files are ready</div>
+      <div class="results-count" id="resultsCount"></div>
+    </div>
+    <button class="btn-zip" id="btnZip">⬇ Download All as ZIP</button>
+  </div>
+
+  <div class="cat-tabs" id="catTabs"></div>
+  <div class="cards-grid" id="cardsGrid"></div>
+</div>
+
+<!-- FAQ -->
+<section class="faq">
+  <h2>Frequently asked questions</h2>
+  <div class="faq-item">
+    <div class="faq-q">How do I compress Aadhaar PDF to under 200KB for bank KYC?</div>
+    <div class="faq-a">Upload your Aadhaar PDF — you'll see a "JPG under 200KB" card. Click download on just that file. No need to download everything.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">How to convert Aadhaar card PDF to JPG online free?</div>
+    <div class="faq-a">Upload your Aadhaar PDF above. AllFormatsReady converts it to JPG in multiple sizes automatically — no sign-up, completely free.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">What is masked Aadhaar and why do portals ask for it?</div>
+    <div class="faq-a">Masked Aadhaar hides first 8 digits of your 12-digit number, showing only last 4. UIDAI recommends it to protect your identity. We auto-generate it when Aadhaar is detected.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">Can I upload a Word document (DOCX)?</div>
+    <div class="faq-a">Yes. Upload any DOCX file and we'll convert it to PDF, JPG, PNG, and WebP automatically.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">Is my Aadhaar card safe to upload here?</div>
+    <div class="faq-a">Yes. Your file is processed instantly and deleted within 60 seconds. We never store, read, or share your documents.</div>
+  </div>
+</section>
+
+<footer>
+  <strong>AllFormatsReady</strong> — Free document converter for Indian government forms & KYC<br>
+  Built for Aadhaar · PAN · Passport · Any document &nbsp;|&nbsp; 100% Free &nbsp;|&nbsp; No sign-up
+</footer>
+
+<script>
+  const API_URL = "https://allformatsready.onrender.com";
+
+  let selectedFile = null;
+  let allFiles = [];
+  let activeCategory = "All";
+
+  const dropZone     = document.getElementById("dropZone");
+  const fileInput    = document.getElementById("fileInput");
+  const filePreview  = document.getElementById("filePreview");
+  const fileIcon     = document.getElementById("fileIcon");
+  const fileName     = document.getElementById("fileName");
+  const fileSize     = document.getElementById("fileSize");
+  const fileRemove   = document.getElementById("fileRemove");
+  const sensitiveNotice = document.getElementById("sensitiveNotice");
+  const btnConvert   = document.getElementById("btnConvert");
+  const progressWrap = document.getElementById("progressWrap");
+  const progressFill = document.getElementById("progressFill");
+  const progressLabel= document.getElementById("progressLabel");
+  const errorWrap    = document.getElementById("errorWrap");
+  const resultsSection = document.getElementById("resultsSection");
+  const resultsCount = document.getElementById("resultsCount");
+  const catTabs      = document.getElementById("catTabs");
+  const cardsGrid    = document.getElementById("cardsGrid");
+  const btnZip       = document.getElementById("btnZip");
+
+  const SENSITIVE_KEYWORDS = ["aadhaar","aadhar","uid","pan","income","passport"];
+
+  function formatBytes(b){
+    if(b<1024) return b+" B";
+    if(b<1048576) return (b/1024).toFixed(1)+" KB";
+    return (b/1048576).toFixed(1)+" MB";
+  }
+
+  function getFileIcon(name){
+    const ext = name.split(".").pop().toLowerCase();
+    if(ext==="pdf") return "📋";
+    if(["jpg","jpeg"].includes(ext)) return "📷";
+    if(ext==="png") return "🖼️";
+    if(["docx","doc"].includes(ext)) return "📝";
+    return "📄";
+  }
+
+  function isSensitive(name){
+    const n = name.toLowerCase();
+    return SENSITIVE_KEYWORDS.some(k => n.includes(k));
+  }
+
+  function fmtBadgeClass(fmt){
+    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf"};
+    return m[fmt] || "fmt-jpg";
+  }
+
+  function setFile(file){
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSize.textContent = formatBytes(file.size);
+    fileIcon.textContent = getFileIcon(file.name);
+    filePreview.classList.add("show");
+    dropZone.style.display = "none";
+    btnConvert.disabled = false;
+    errorWrap.classList.remove("show");
+    resultsSection.style.display = "none";
+    progressWrap.classList.remove("show");
+    if(isSensitive(file.name)){
+      sensitiveNotice.classList.add("show");
+    } else {
+      sensitiveNotice.classList.remove("show");
     }
+  }
 
-    function getIcon(type) {
-      if (type === "application/pdf") return "📋";
-      if (type.startsWith("image/png")) return "🖼️";
-      if (type.startsWith("image/")) return "📷";
-      return "📄";
-    }
+  function reset(){
+    selectedFile = null; allFiles = [];
+    fileInput.value = "";
+    filePreview.classList.remove("show");
+    sensitiveNotice.classList.remove("show");
+    dropZone.style.display = "";
+    btnConvert.disabled = true;
+    progressWrap.classList.remove("show");
+    resultsSection.style.display = "none";
+    errorWrap.classList.remove("show");
+    progressFill.style.width = "0%";
+  }
 
-    function showError(msg) {
-      errorWrap.textContent = "⚠️ " + msg;
-      errorWrap.classList.add("show");
-    }
+  fileInput.addEventListener("change", () => { if(fileInput.files[0]) setFile(fileInput.files[0]); });
+  fileRemove.addEventListener("click", reset);
 
-    function hideError() {
-      errorWrap.classList.remove("show");
-    }
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault(); dropZone.classList.remove("dragover");
+    if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
 
-    function setFile(file) {
-      selectedFile = file;
-      fileName.textContent = file.name;
-      fileSize.textContent = formatBytes(file.size);
-      fileIcon.textContent = getIcon(file.type);
-      filePreview.classList.add("show");
-      dropZone.style.display = "none";
-      btnConvert.disabled = false;
-      hideError();
-      successWrap.classList.remove("show");
-      progressWrap.classList.remove("show");
-    }
-
-    function reset() {
-      selectedFile = null;
-      downloadUrl = null;
-      fileInput.value = "";
-      filePreview.classList.remove("show");
-      dropZone.style.display = "";
-      btnConvert.disabled = true;
-      progressWrap.classList.remove("show");
-      successWrap.classList.remove("show");
-      hideError();
-      progressFill.style.width = "0%";
-    }
-
-    // ── File selection ──
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files[0]) setFile(fileInput.files[0]);
+  // Render cards filtered by category
+  function renderCards(category){
+    activeCategory = category;
+    // Update tab styles
+    document.querySelectorAll(".cat-tab").forEach(t => {
+      t.classList.toggle("active", t.dataset.cat === category);
     });
 
-    fileRemove.addEventListener("click", reset);
-    btnAgain.addEventListener("click", reset);
+    const filtered = category === "All" ? allFiles : allFiles.filter(f => f.category === category);
+    const maxSize = Math.max(...filtered.map(f => f.size_bytes), 1);
 
-    // ── Drag & Drop ──
-    dropZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropZone.classList.add("dragover");
+    cardsGrid.innerHTML = "";
+    filtered.forEach(f => {
+      const pct = Math.round((f.size_bytes / maxSize) * 100);
+      const isMasked = f.label.toLowerCase().includes("masked");
+      const card = document.createElement("div");
+      card.className = "file-card" + (isMasked ? " masked" : "");
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="card-fmt-badge ${fmtBadgeClass(f.format)}">${f.format}</span>
+          <span class="card-label">${f.label}</span>
+        </div>
+        ${isMasked ? '<span class="masked-tag">🔐 Masked</span>' : ""}
+        <div class="card-size">
+          <span>${f.size_kb} KB</span>
+          <div class="size-bar-bg"><div class="size-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+        <a class="btn-dl" href="#" data-name="${f.name}" data-b64="${f.data_b64}" data-fmt="${f.format}">⬇ Download</a>
+      `;
+      cardsGrid.appendChild(card);
     });
-    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-    dropZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropZone.classList.remove("dragover");
-      const file = e.dataTransfer.files[0];
-      if (file) setFile(file);
+
+    // Attach download handlers
+    cardsGrid.querySelectorAll(".btn-dl").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.preventDefault();
+        const b64 = btn.dataset.b64;
+        const name = btn.dataset.name;
+        const fmt = btn.dataset.fmt.toLowerCase();
+        const mimeMap = {jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",pdf:"application/pdf"};
+        const ext = name.split(".").pop().toLowerCase();
+        const mime = mimeMap[ext] || "application/octet-stream";
+        const byteChars = atob(b64);
+        const byteArr = new Uint8Array(byteChars.length);
+        for(let i=0;i<byteChars.length;i++) byteArr[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([byteArr], {type: mime});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = name; a.click();
+        URL.revokeObjectURL(url);
+      });
     });
+  }
 
-    // ── Convert ──
-    btnConvert.addEventListener("click", async () => {
-      if (!selectedFile) return;
+  // Download all as ZIP
+  btnZip.addEventListener("click", async () => {
+    // Dynamic import JSZip from CDN
+    if(!window.JSZip){
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      document.head.appendChild(script);
+      await new Promise(res => script.onload = res);
+    }
+    const zip = new JSZip();
+    allFiles.forEach(f => {
+      const byteChars = atob(f.data_b64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for(let i=0;i<byteChars.length;i++) byteArr[i] = byteChars.charCodeAt(i);
+      zip.file(`allformatsready/${f.category}/${f.name}`, byteArr);
+    });
+    const blob = await zip.generateAsync({type:"blob"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "allformatsready.zip"; a.click();
+    URL.revokeObjectURL(url);
+  });
 
-      hideError();
-      btnConvert.disabled = true;
-      progressWrap.classList.add("show");
-      successWrap.classList.remove("show");
+  // Convert
+  btnConvert.addEventListener("click", async () => {
+    if(!selectedFile) return;
+    errorWrap.classList.remove("show");
+    btnConvert.disabled = true;
+    progressWrap.classList.add("show");
+    resultsSection.style.display = "none";
 
-      // Fake progress animation while server processes
-      const steps = [
-        [10, "Reading your document…"],
-        [30, "Converting to all formats…"],
-        [55, "Compressing to size targets…"],
-        [75, "Generating masked Aadhaar…"],
-        [90, "Packaging your ZIP…"],
-      ];
-      let stepIndex = 0;
-      const progressTimer = setInterval(() => {
-        if (stepIndex < steps.length) {
-          const [pct, label] = steps[stepIndex++];
-          progressFill.style.width = pct + "%";
-          progressLabel.textContent = label;
-        }
-      }, 800);
+    const steps = [
+      [15,"Reading your document…"],
+      [35,"Converting to all formats…"],
+      [60,"Compressing to size targets…"],
+      [80,"Generating masked version if needed…"],
+      [92,"Almost done…"],
+    ];
+    let si = 0;
+    const timer = setInterval(() => {
+      if(si < steps.length){
+        progressFill.style.width = steps[si][0] + "%";
+        progressLabel.textContent = steps[si][1];
+        si++;
+      }
+    }, 900);
 
-      try {
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
 
-        const res = await fetch(`${API_URL}/convert`, {
-          method: "POST",
-          body: formData,
-        });
+      const res = await fetch(`${API_URL}/convert`, { method:"POST", body:formData });
+      clearInterval(timer);
 
-        clearInterval(progressTimer);
+      if(!res.ok){
+        const err = await res.json().catch(() => ({detail:"Server error"}));
+        throw new Error(err.detail || "Conversion failed");
+      }
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: "Server error" }));
-          throw new Error(err.detail || "Conversion failed");
-        }
+      const data = await res.json();
+      allFiles = data.files;
 
-        progressFill.style.width = "100%";
-        progressLabel.textContent = "Done!";
+      progressFill.style.width = "100%";
+      progressLabel.textContent = "Done!";
 
-        const blob = await res.blob();
-        downloadUrl = URL.createObjectURL(blob);
-        downloadBtn.href = downloadUrl;
-        downloadBtn.download = "allformatsready.zip";
-
-        const sizeKb = Math.round(blob.size / 1024);
-        successSub.textContent = `Your ZIP (${sizeKb} KB) contains every format and size you'll ever need.`;
-
-        setTimeout(() => {
-          progressWrap.classList.remove("show");
-          successWrap.classList.add("show");
-          btnConvert.disabled = false;
-        }, 600);
-
-      } catch (err) {
-        clearInterval(progressTimer);
+      setTimeout(() => {
         progressWrap.classList.remove("show");
         btnConvert.disabled = false;
-        showError(err.message || "Something went wrong. Please try again.");
-      }
+        showResults();
+      }, 500);
+
+    } catch(err){
+      clearInterval(timer);
+      progressWrap.classList.remove("show");
+      btnConvert.disabled = false;
+      errorWrap.textContent = "⚠️ " + (err.message || "Something went wrong. Please try again.");
+      errorWrap.classList.add("show");
+    }
+  });
+
+  function showResults(){
+    resultsSection.style.display = "block";
+    resultsCount.textContent = `${allFiles.length} files generated`;
+
+    // Build category tabs
+    const cats = ["All", ...new Set(allFiles.map(f => f.category))];
+    catTabs.innerHTML = "";
+    cats.forEach(cat => {
+      const tab = document.createElement("button");
+      tab.className = "cat-tab" + (cat === "All" ? " active" : "");
+      tab.dataset.cat = cat;
+      const count = cat === "All" ? allFiles.length : allFiles.filter(f => f.category === cat).length;
+      tab.textContent = `${cat} (${count})`;
+      tab.addEventListener("click", () => renderCards(cat));
+      catTabs.appendChild(tab);
     });
-  </script>
+
+    renderCards("All");
+    resultsSection.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+</script>
 </body>
 </html>
