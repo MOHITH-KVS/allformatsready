@@ -706,6 +706,13 @@
   });
 
 
+  // ── Keep-alive ping every 10 mins so Render never sleeps ──
+  setInterval(() => {
+    fetch(API_URL + "/ping").catch(() => {});
+  }, 10 * 60 * 1000); // every 10 minutes
+  // Initial ping on page load
+  fetch(API_URL + "/ping").catch(() => {});
+
   // ── Portal Presets ──
   const PORTALS = [
     {

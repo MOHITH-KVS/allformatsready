@@ -4,12 +4,13 @@ import re
 import base64
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 fitz_mod = None
 Image_cls = None
+
 def load_libs():
     global fitz_mod, Image_cls
     if fitz_mod is None:
@@ -25,7 +26,35 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="AllFormatsReady API", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Explicit CORS — handles preflight OPTIONS requests properly
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+
+# Extra safety — manually add CORS headers on every response
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return Response(
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
 AADHAAR_RE = re.compile(r'\b\d{4}\s?\d{4}\s?\d{4}\b')
@@ -162,6 +191,9 @@ def root(): return {"status": "AllFormatsReady API is live"}
 
 @app.get("/health")
 def health(): return {"status": "ok"}
+
+@app.get("/ping")
+def ping(): return {"ping": "pong"}  # keep-alive endpoint
 
 
 @app.post("/convert")
