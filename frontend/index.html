@@ -153,6 +153,7 @@
     .fmt-png{background:#ECFDF5;color:#065F46}
     .fmt-webp{background:#EDE9FE;color:#4C1D95}
     .fmt-pdf{background:#FEE2E2;color:#991B1B}
+    .fmt-docx{background:#DBEAFE;color:#1E40AF}
     .card-label{font-size:.83rem;font-weight:700;color:var(--gray-800);line-height:1.3;flex:1}
     .card-page-tag{font-size:.68rem;color:var(--gray-500);background:var(--gray-100);padding:1px 7px;border-radius:10px;align-self:flex-start}
     .masked-tag{font-size:.68rem;background:#FED7AA;color:#92400E;padding:2px 8px;border-radius:10px;font-weight:700;align-self:flex-start;display:flex;align-items:center;gap:3px}
@@ -297,7 +298,7 @@
     <div class="drop-formats">
       <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
       <span class="drop-fmt">WebP</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">BMP</span>
-      <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span>
+      <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span><span class="drop-fmt">DOCX</span>
     </div>
   </div>
 
@@ -360,12 +361,6 @@
 </div>
 
 
-<!-- Portal Presets -->
-<div class="preset-section" id="presetSection" style="display:none">
-  <div class="preset-label">🏛 Choose your portal <span>NEW</span></div>
-  <div class="preset-grid" id="presetGrid"></div>
-</div>
-
 <!-- Results -->
 <div class="results" id="resultsSection" style="display:none">
   <div class="results-header">
@@ -385,6 +380,11 @@
       These converted files exist only in your browser memory — they are never stored on any server.
       Close this tab and they are gone permanently.
     </div>
+  </div>
+  <!-- Portal presets INSIDE results -->
+  <div class="preset-section" id="presetSection">
+    <div class="preset-label">🏛 Choose your portal to highlight the right files <span>NEW</span></div>
+    <div class="preset-grid" id="presetGrid"></div>
   </div>
   <div class="preset-banner" id="presetBanner"><span id="presetBannerIcon"></span><span id="presetBannerText"></span><button class="preset-clear" id="presetClear">✕ Clear filter</button></div>
   <div class="cat-tabs" id="catTabs"></div>
@@ -499,7 +499,7 @@
   }
 
   function fmtBadgeClass(fmt){
-    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf"};
+    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx"};
     return m[fmt] || "fmt-jpg";
   }
 
@@ -513,8 +513,6 @@
     btnConvert.disabled = false;
     errorWrap.classList.remove("show");
     resultsSection.style.display = "none";
-    const ps = document.getElementById("presetSection");
-    if(ps) ps.style.display = "none";
     clearPreset();
     progressWrap.classList.remove("show");
     pageSelector.classList.remove("show");
@@ -626,6 +624,11 @@
           <img src="${imgSrc}" alt="${f.label}" loading="lazy"/>
           <button class="card-preview-expand" title="View full size">⛶ View</button>
         </div>`;
+      } else if(f.format === "DOCX"){
+        previewHtml = `<div class="card-preview-pdf" style="background:linear-gradient(135deg,#DBEAFE,#EFF6FF)">
+          <span class="pdficon">📝</span>
+          <span class="pdflabel" style="color:#1E40AF">Word Document</span>
+        </div>`;
       } else if(isPDF){
         previewHtml = `<div class="card-preview-pdf">
           <span class="pdficon">📋</span>
@@ -656,7 +659,7 @@
         const b64 = btn.dataset.b64;
         const name = btn.dataset.name;
         const ext = name.split(".").pop().toLowerCase();
-        const mimeMap = {jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",pdf:"application/pdf"};
+        const mimeMap = {jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",pdf:"application/pdf",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"};
         const mime = mimeMap[ext] || "application/octet-stream";
         const byteChars = atob(b64);
         const byteArr = new Uint8Array(byteChars.length);
@@ -931,8 +934,7 @@
     });
 
     renderCards("All");
-    document.getElementById("presetSection").style.display = "block";
-  buildPresets();
+    buildPresets();
   resultsSection.scrollIntoView({behavior:"smooth", block:"start"});
   }
 
