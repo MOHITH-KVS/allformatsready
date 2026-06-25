@@ -1,19 +1,33 @@
 import os
 import io
 import re
-import json
 import base64
-import threading
-import time
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import fitz
-from PIL import Image
 
-app = FastAPI(title="AllFormatsReady API")
+# Heavy libraries — imported at module level but after FastAPI starts
+fitz = None
+Image = None
+
+def load_libs():
+    global fitz, Image
+    if fitz is None:
+        import fitz as _fitz
+        fitz = _fitz
+    if Image is None:
+        from PIL import Image as _Image
+        Image = _Image
+
+@asynccontextmanager
+async def lifespan(app):
+    load_libs()  # pre-load on startup so first request is fast
+    yield
+
+app = FastAPI(title="AllFormatsReady API", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 MAX_FILE_SIZE = 15 * 1024 * 1024
@@ -144,6 +158,7 @@ def health(): return {"status": "ok"}
 
 @app.post("/convert")
 async def convert(file: UploadFile = File(...)):
+    load_libs()  # ensure libs are loaded
     filename = file.filename or "document"
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     file_bytes = await file.read()
