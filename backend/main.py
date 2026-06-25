@@ -186,7 +186,7 @@ async def convert(file: UploadFile = File(...)):
             detail="DOCX upload is not supported yet. Please convert your Word document to PDF first, then upload the PDF."
         )
 
-        if is_pdf:
+    elif is_pdf:
         doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
         total_pages = len(doc)
         text = "".join(p.get_text() for p in doc)
