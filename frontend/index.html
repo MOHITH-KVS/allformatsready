@@ -508,6 +508,13 @@
   }
 
   function setFile(file){
+    // Client-side size check
+    if(file.size > 15 * 1024 * 1024){
+      errorWrap.textContent = "⚠️ File too large. Maximum size is 15MB.";
+      errorWrap.classList.add("show");
+      fileInput.value = "";
+      return;
+    }
     selectedFile = file;
     fileName.textContent = file.name;
     fileMeta.textContent = formatBytes(file.size) + " · " + file.name.split(".").pop().toUpperCase();
@@ -866,6 +873,52 @@
     a.href=url; a.download="allformatsready.zip"; a.click();
     URL.revokeObjectURL(url);
   });
+
+
+  // ── Client-side compression for large images ──
+  const COMPRESS_THRESHOLD = 2 * 1024 * 1024; // 2MB — only compress if larger
+  const MAX_DIMENSION = 1800; // max width or height after resize
+
+  async function compressIfNeeded(file) {
+    // PDFs — cannot compress in browser, send as-is
+    const ext = file.name.split(".").pop().toLowerCase();
+    if(ext === "pdf") return file;
+
+    // Small files — send as-is, no quality loss
+    if(file.size <= COMPRESS_THRESHOLD) return file;
+
+    // Large image — compress in browser using Canvas
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          // Calculate new dimensions keeping aspect ratio
+          let w = img.width, h = img.height;
+          if(w > MAX_DIMENSION || h > MAX_DIMENSION){
+            if(w > h){ h = Math.round(h * MAX_DIMENSION / w); w = MAX_DIMENSION; }
+            else { w = Math.round(w * MAX_DIMENSION / h); h = MAX_DIMENSION; }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Export as JPEG at 88% quality — good balance of size vs quality
+          canvas.toBlob((blob) => {
+            const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+            const savedMB = ((file.size - compressed.size) / 1024 / 1024).toFixed(1);
+            console.log(`Compressed: ${(file.size/1024/1024).toFixed(1)}MB → ${(compressed.size/1024/1024).toFixed(1)}MB (saved ${savedMB}MB)`);
+            resolve(compressed);
+          }, "image/jpeg", 0.88);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   // ── Convert ──
   btnConvert.addEventListener("click", async () => {

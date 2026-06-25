@@ -27,7 +27,7 @@ async def lifespan(app):
 app = FastAPI(title="AllFormatsReady API", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-MAX_FILE_SIZE = 15 * 1024 * 1024
+MAX_FILE_SIZE = 10 * 1024 * 1024
 AADHAAR_RE = re.compile(r'\b\d{4}\s?\d{4}\s?\d{4}\b')
 PAN_RE = re.compile(r'\b[A-Z]{5}[0-9]{4}[A-Z]\b')
 SENSITIVE_KW = ["aadhaar","aadhar","uid","pan","income","passport"]
@@ -40,7 +40,7 @@ def is_sensitive(filename, text=""):
     return False
 
 
-def pdf_page_to_pil(page, dpi=150):
+def pdf_page_to_pil(page, dpi=120):
     mat = fitz_mod.Matrix(dpi/72, dpi/72)
     pix = page.get_pixmap(matrix=mat, alpha=False)
     return Image_cls.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -126,13 +126,19 @@ def image_outputs(img, prefix="", page_num=None):
     pg = f" · Page {page_num}" if page_num else ""
     p = f"p{page_num}_" if page_num else ""
 
-    # JPG quality variants
-    for q, lbl in [(90,"High Quality"),(70,"Medium Quality"),(45,"Low Quality")]:
+    # Resize large images to max 1200px wide to keep response small
+    max_w = 1200
+    if img.width > max_w:
+        ratio = max_w / img.width
+        img = img.resize((max_w, int(img.height * ratio)), Image_cls.LANCZOS)
+
+    # JPG quality variants (2 instead of 3)
+    for q, lbl in [(85,"High Quality"),(50,"Compressed")]:
         d = img_bytes(img, "JPEG", q)
         outputs.append(make_file(f"{p}jpg_{lbl.lower().replace(' ','_')}.jpg","JPG",d,f"JPG — {lbl}{pg}","JPG",page_num))
 
     # JPG size targets
-    for kb in [100, 200, 500, 1024]:
+    for kb in [100, 200, 500]:
         d = compress_to_target(img, "JPEG", kb)
         outputs.append(make_file(f"{p}jpg_under_{kb}kb.jpg","JPG",d,f"JPG — Under {kb}KB{pg}","JPG",page_num))
 
@@ -140,11 +146,7 @@ def image_outputs(img, prefix="", page_num=None):
     d = img_bytes(img, "PNG")
     outputs.append(make_file(f"{p}image.png","PNG",d,f"PNG — Lossless{pg}","PNG",page_num))
 
-    # WebP variants
-    for q, lbl in [(85,"High Quality"),(50,"Compressed")]:
-        d = img_bytes(img, "WEBP", q)
-        outputs.append(make_file(f"{p}webp_{lbl.lower()}.webp","WEBP",d,f"WebP — {lbl}{pg}","WebP",page_num))
-
+    # WebP compressed
     d = compress_to_target(img, "WEBP", 200)
     outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg}","WebP",page_num))
 
@@ -170,7 +172,7 @@ async def convert(file: UploadFile = File(...)):
     file_bytes = await file.read()
 
     if len(file_bytes) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="File too large. Max 15MB allowed.")
+        raise HTTPException(status_code=400, detail="File too large. Max 10MB allowed.")
 
     outputs = []
     total_pages = 1
