@@ -473,40 +473,38 @@
   });
 
   // ── Timer (inline + floating) ──
-  const floatingTimer = document.getElementById("floatingTimer");
-  const ftNum         = document.getElementById("ftNum");
-  const ftRingFill    = document.getElementById("ftRingFill");
-  const FT_CIRC       = 2 * Math.PI * 17;
+  const FT_CIRC = 2 * Math.PI * 17;
 
   function startTimer(seconds){
     stopTimer();
+    // Get floating timer elements lazily (they are below the script tag in HTML)
+    const ft     = document.getElementById("floatingTimer");
+    const ftN    = document.getElementById("ftNum");
+    const ftR    = document.getElementById("ftRingFill");
     timerWrap.classList.add("show");
-    floatingTimer.classList.add("show");
-    floatingTimer.classList.remove("urgent");
+    if(ft){ ft.classList.add("show"); ft.classList.remove("urgent"); }
     let remaining = seconds;
     const update = () => {
       timerNum.textContent = remaining + "s";
-      ftNum.textContent    = remaining + "s";
-      const pct    = remaining / seconds;
-      const offset = FT_CIRC * (1 - pct);
+      if(ftN) ftN.textContent = remaining + "s";
+      const pct = remaining / seconds;
       timerRingFill.style.strokeDashoffset = CIRCUMFERENCE * (1 - pct);
-      ftRingFill.style.strokeDashoffset    = offset;
-      if(remaining <= 15) floatingTimer.classList.add("urgent");
+      if(ftR) ftR.style.strokeDashoffset = FT_CIRC * (1 - pct);
+      if(ft && remaining <= 15) ft.classList.add("urgent");
     };
     update();
     timerInterval = setInterval(() => {
       remaining--;
       update();
-      if(remaining <= 0){
-        stopTimer();
-      }
+      if(remaining <= 0) stopTimer();
     }, 1000);
   }
 
   function stopTimer(){
     if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
     timerWrap.classList.remove("show");
-    if(floatingTimer) floatingTimer.classList.remove("show","urgent");
+    const ft = document.getElementById("floatingTimer");
+    if(ft) ft.classList.remove("show","urgent");
   }
 
   // ── Progress steps ──
