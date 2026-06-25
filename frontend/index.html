@@ -176,6 +176,25 @@
     footer{text-align:center;padding:24px 20px;font-size:.76rem;color:var(--gray-400);border-top:1px solid var(--gray-200);background:#fff}
     footer strong{color:var(--gray-600)}
 
+    /* Floating timer */
+    .floating-timer{
+      display:none;position:fixed;bottom:24px;right:24px;z-index:999;
+      background:#fff;border:2px solid #BBF7D0;border-radius:16px;
+      padding:14px 18px;box-shadow:0 8px 32px rgba(0,0,0,.14);
+      align-items:center;gap:12px;min-width:200px;
+    }
+    .floating-timer.show{display:flex}
+    .floating-timer.urgent{border-color:#FECACA;background:#FFF5F5}
+    .floating-timer.urgent .timer-ring-fill{stroke:#DC2626}
+    .floating-timer.urgent .ft-label{color:#DC2626}
+    .floating-timer.urgent .ft-num{color:#DC2626}
+    .ft-ring{width:44px;height:44px;flex-shrink:0;transform:rotate(-90deg)}
+    .ft-ring-bg{fill:none;stroke:#E5E7EB;stroke-width:3.5}
+    .ft-ring-fill{fill:none;stroke:#16A34A;stroke-width:3.5;stroke-linecap:round;stroke-dasharray:107;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear,stroke .3s}
+    .ft-text{display:flex;flex-direction:column;gap:1px}
+    .ft-num{font-size:1.3rem;font-weight:800;color:#15803D;line-height:1}
+    .ft-label{font-size:.72rem;color:#15803D;font-weight:500;line-height:1.4}
+
     @media(max-width:600px){
       .cards-grid{grid-template-columns:1fr 1fr}
       .faq-grid{grid-template-columns:1fr}
@@ -453,21 +472,33 @@
     if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
   });
 
-  // ── Timer ──
+  // ── Timer (inline + floating) ──
+  const floatingTimer = document.getElementById("floatingTimer");
+  const ftNum         = document.getElementById("ftNum");
+  const ftRingFill    = document.getElementById("ftRingFill");
+  const FT_CIRC       = 2 * Math.PI * 17;
+
   function startTimer(seconds){
     stopTimer();
     timerWrap.classList.add("show");
+    floatingTimer.classList.add("show");
+    floatingTimer.classList.remove("urgent");
     let remaining = seconds;
-    timerNum.textContent = remaining + "s";
-    timerRingFill.style.strokeDashoffset = "0";
+    const update = () => {
+      timerNum.textContent = remaining + "s";
+      ftNum.textContent    = remaining + "s";
+      const pct    = remaining / seconds;
+      const offset = FT_CIRC * (1 - pct);
+      timerRingFill.style.strokeDashoffset = CIRCUMFERENCE * (1 - pct);
+      ftRingFill.style.strokeDashoffset    = offset;
+      if(remaining <= 15) floatingTimer.classList.add("urgent");
+    };
+    update();
     timerInterval = setInterval(() => {
       remaining--;
-      timerNum.textContent = remaining + "s";
-      const offset = CIRCUMFERENCE * (1 - remaining / seconds);
-      timerRingFill.style.strokeDashoffset = offset;
+      update();
       if(remaining <= 0){
         stopTimer();
-        timerWrap.classList.remove("show");
       }
     }, 1000);
   }
@@ -475,6 +506,7 @@
   function stopTimer(){
     if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
     timerWrap.classList.remove("show");
+    if(floatingTimer) floatingTimer.classList.remove("show","urgent");
   }
 
   // ── Progress steps ──
@@ -639,6 +671,24 @@
     renderCards("All");
     resultsSection.scrollIntoView({behavior:"smooth", block:"start"});
   }
+
 </script>
+
+<!-- Floating countdown timer (fixed bottom-right) -->
+<div class="floating-timer" id="floatingTimer">
+  <svg class="ft-ring" viewBox="0 0 38 38">
+    <circle class="ft-ring-bg" cx="19" cy="19" r="17"/>
+    <circle class="ft-ring-fill" id="ftRingFill" cx="19" cy="19" r="17"/>
+  </svg>
+  <div class="ft-text">
+    <span class="ft-num" id="ftNum">60s</span>
+    <span class="ft-label">🔒 File deletes<br>from server</span>
+  </div>
+</div>
+
+<footer>
+  <strong>AllFormatsReady</strong> — Free document converter for Indian government forms & KYC<br>
+  Built for Aadhaar · PAN · Passport · Any document &nbsp;|&nbsp; 100% Free &nbsp;|&nbsp; No sign-up required
+</footer>
 </body>
 </html>
