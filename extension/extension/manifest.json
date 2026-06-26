@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "AllFormatsReady — Document Converter",
+  "short_name": "AllFormatsReady",
+  "version": "1.0.0",
+  "description": "Upload any document once — get PDF, JPG, PNG, WebP in all sizes instantly. Auto-detects the portal you're on and highlights the right format.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AllFormatsReady — Convert Documents",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://allformatsready.onrender.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

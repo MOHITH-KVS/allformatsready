@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AllFormatsReady</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --brand:#2563EB;--brand-dark:#1D4ED8;--brand-light:#EFF6FF;
+      --success:#16A34A;--success-light:#F0FDF4;
+      --danger:#DC2626;
+      --gray-50:#F9FAFB;--gray-100:#F3F4F6;--gray-200:#E5E7EB;
+      --gray-400:#9CA3AF;--gray-500:#6B7280;--gray-600:#4B5563;
+      --gray-800:#1F2937;--gray-900:#111827;
+      --radius:10px;
+    }
+
+    body{
+      width:380px;
+      min-height:200px;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      background:var(--gray-50);
+      color:var(--gray-800);
+      font-size:13px;
+    }
+
+    /* ── Header ── */
+    .ext-header{
+      background:#fff;
+      border-bottom:1px solid var(--gray-200);
+      padding:12px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .ext-logo{font-size:1rem;font-weight:800;color:var(--brand)}
+    .ext-logo span{color:var(--gray-900)}
+    .ext-badge{background:var(--brand-light);color:var(--brand);font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:10px}
+
+    /* ── Portal detected banner ── */
+    .portal-banner{
+      display:none;
+      margin:12px 12px 0;
+      padding:10px 12px;
+      border-radius:8px;
+      background:var(--brand-light);
+      border:1.5px solid #BFDBFE;
+      align-items:center;
+      gap:8px;
+    }
+    .portal-banner.show{display:flex}
+    .portal-banner.general{background:#F0FDF4;border-color:#BBF7D0}
+    .portal-icon{font-size:1.2rem;flex-shrink:0}
+    .portal-info{}
+    .portal-name{font-size:.8rem;font-weight:700;color:var(--brand-dark)}
+    .portal-banner.general .portal-name{color:#15803D}
+    .portal-req{font-size:.7rem;color:var(--gray-500);margin-top:1px}
+
+    /* ── Upload zone ── */
+    .upload-section{padding:12px}
+    .drop-zone{
+      border:2px dashed var(--gray-200);
+      border-radius:8px;
+      padding:20px 14px;
+      text-align:center;
+      cursor:pointer;
+      background:#fff;
+      transition:border-color .2s,background .2s;
+      position:relative;
+    }
+    .drop-zone.dragover{border-color:var(--brand);background:var(--brand-light)}
+    .drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .drop-icon{font-size:1.8rem;display:block;margin-bottom:6px}
+    .drop-title{font-size:.82rem;font-weight:600;color:var(--gray-800);margin-bottom:3px}
+    .drop-sub{font-size:.72rem;color:var(--gray-400)}
+
+    /* ── File preview ── */
+    .file-preview{
+      display:none;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      background:var(--gray-50);
+      border:1px solid var(--gray-200);
+      border-radius:7px;
+      margin-bottom:8px;
+    }
+    .file-preview.show{display:flex}
+    .fp-icon{font-size:1.2rem;flex-shrink:0}
+    .fp-name{font-size:.78rem;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .fp-size{font-size:.7rem;color:var(--gray-400)}
+    .fp-remove{background:none;border:none;cursor:pointer;color:var(--gray-400);padding:2px;font-size:.9rem}
+    .fp-remove:hover{color:var(--danger)}
+
+    /* ── Convert button ── */
+    .btn-convert{
+      display:block;width:100%;padding:11px;
+      background:var(--brand);color:#fff;border:none;border-radius:8px;
+      font-size:.85rem;font-weight:700;cursor:pointer;
+      transition:background .2s;
+    }
+    .btn-convert:hover:not(:disabled){background:var(--brand-dark)}
+    .btn-convert:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed}
+
+    /* ── Progress ── */
+    .progress-wrap{display:none;margin-top:8px}
+    .progress-wrap.show{display:block}
+    .progress-bar-bg{background:var(--gray-100);border-radius:20px;height:5px;overflow:hidden;margin-bottom:6px}
+    .progress-bar-fill{height:100%;background:var(--brand);border-radius:20px;width:0%;transition:width .4s}
+    .progress-label{font-size:.72rem;color:var(--gray-500);text-align:center}
+
+    /* ── Error ── */
+    .error-wrap{display:none;padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;color:var(--danger);font-size:.75rem;margin-top:8px}
+    .error-wrap.show{display:block}
+
+    /* ── Results ── */
+    .results-wrap{display:none;padding:0 12px 12px}
+    .results-wrap.show{display:block}
+
+    .results-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:10px;gap:8px;
+    }
+    .results-title{font-size:.82rem;font-weight:700;color:var(--gray-900)}
+    .results-count{font-size:.7rem;color:var(--gray-500)}
+    .btn-zip{
+      background:var(--gray-900);color:#fff;border:none;border-radius:6px;
+      padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;
+      white-space:nowrap;
+    }
+    .btn-zip:hover{background:#000}
+
+    /* ── Recommended section ── */
+    .section-label{
+      font-size:.68rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.5px;color:var(--gray-400);margin:8px 0 6px;
+      display:flex;align-items:center;gap:6px;
+    }
+    .section-label::after{content:"";flex:1;height:1px;background:var(--gray-100)}
+    .section-label.recommended{color:var(--brand)}
+
+    /* ── File cards ── */
+    .cards-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
+    .file-card{
+      background:#fff;border:1.5px solid var(--gray-200);border-radius:8px;
+      padding:8px 10px;display:flex;align-items:center;gap:8px;
+      transition:all .15s;
+    }
+    .file-card.recommended{border-color:var(--brand);background:var(--brand-light)}
+    .file-card.dimmed{opacity:.55}
+    .file-card.dimmed:hover{opacity:.8}
+    .card-fmt{
+      font-size:.58rem;font-weight:800;padding:2px 5px;border-radius:4px;
+      text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;
+    }
+    .fmt-jpg{background:#FEF3C7;color:#92400E}
+    .fmt-png{background:#ECFDF5;color:#065F46}
+    .fmt-webp{background:#EDE9FE;color:#4C1D95}
+    .fmt-pdf{background:#FEE2E2;color:#991B1B}
+    .fmt-docx{background:#DBEAFE;color:#1E40AF}
+    .card-label{font-size:.75rem;font-weight:600;color:var(--gray-800);flex:1;line-height:1.3}
+    .card-size{font-size:.68rem;color:var(--gray-400);white-space:nowrap}
+    .btn-dl{
+      background:var(--brand-light);color:var(--brand);border:1px solid #BFDBFE;
+      border-radius:5px;padding:4px 8px;font-size:.7rem;font-weight:700;
+      cursor:pointer;white-space:nowrap;flex-shrink:0;
+    }
+    .file-card.recommended .btn-dl{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn-dl:hover{opacity:.85}
+
+    /* ── Convert another ── */
+    .btn-again{
+      display:block;width:100%;margin-top:8px;padding:8px;
+      background:#fff;color:var(--brand);border:1.5px solid var(--brand);
+      border-radius:7px;font-size:.78rem;font-weight:700;cursor:pointer;
+      text-align:center;
+    }
+    .btn-again:hover{background:var(--brand-light)}
+
+    /* ── Footer link ── */
+    .ext-footer{
+      padding:8px 12px;border-top:1px solid var(--gray-100);
+      text-align:center;font-size:.65rem;color:var(--gray-400);
+    }
+    .ext-footer a{color:var(--brand);text-decoration:none;font-weight:600}
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="ext-header">
+  <div class="ext-logo">All<span>Formats</span>Ready</div>
+  <div class="ext-badge">Free · No sign-up</div>
+</div>
+
+<!-- Portal detected banner -->
+<div class="portal-banner" id="portalBanner">
+  <span class="portal-icon" id="portalIcon">📄</span>
+  <div class="portal-info">
+    <div class="portal-name" id="portalName">Detecting portal…</div>
+    <div class="portal-req" id="portalReq"></div>
+  </div>
+</div>
+
+<!-- Upload section -->
+<div class="upload-section" id="uploadSection">
+  <div class="file-preview" id="filePreview">
+    <span class="fp-icon" id="fpIcon">📄</span>
+    <div>
+      <div class="fp-name" id="fpName"></div>
+      <div class="fp-size" id="fpSize"></div>
+    </div>
+    <button class="fp-remove" id="fpRemove">✕</button>
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.heic,.heif"/>
+    <span class="drop-icon">📂</span>
+    <div class="drop-title">Drop your document here</div>
+    <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 15MB</div>
+  </div>
+
+  <div class="error-wrap" id="errorWrap"></div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">Processing…</div>
+  </div>
+
+  <button class="btn-convert" id="btnConvert" disabled style="margin-top:8px">
+    Generate All Formats →
+  </button>
+</div>
+
+<!-- Results -->
+<div class="results-wrap" id="resultsWrap">
+  <div class="results-header">
+    <div>
+      <div class="results-title">✅ Files ready</div>
+      <div class="results-count" id="resultsCount"></div>
+    </div>
+    <button class="btn-zip" id="btnZip">⬇ Download ZIP</button>
+  </div>
+
+  <div class="cards-list" id="cardsList"></div>
+  <button class="btn-again" id="btnAgain">+ Convert Another File</button>
+</div>
+
+<!-- Footer -->
+<div class="ext-footer">
+  <a href="https://allformatsready.vercel.app" target="_blank">Open full site</a>
+  &nbsp;·&nbsp; AllFormatsReady
+</div>
+
+<script src="portals.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
