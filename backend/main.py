@@ -10,15 +10,22 @@ from fastapi.responses import JSONResponse, Response
 
 fitz_mod = None
 Image_cls = None
+DocxDocument = None
 
 def load_libs():
-    global fitz_mod, Image_cls
+    global fitz_mod, Image_cls, DocxDocument
     if fitz_mod is None:
         import fitz as _fitz
         fitz_mod = _fitz
     if Image_cls is None:
         from PIL import Image as _Image
         Image_cls = _Image
+    if DocxDocument is None:
+        try:
+            from docx import Document as _Doc
+            DocxDocument = _Doc
+        except:
+            DocxDocument = None
 
 @asynccontextmanager
 async def lifespan(app):
@@ -27,7 +34,7 @@ async def lifespan(app):
 
 app = FastAPI(title="AllFormatsReady API", lifespan=lifespan)
 
-# Explicit CORS — handles preflight OPTIONS requests properly
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,7 +45,7 @@ app.add_middleware(
     max_age=3600,
 )
 
-# Extra safety — manually add CORS headers on every response
+# Extra CORS safety on every response
 @app.middleware("http")
 async def add_cors_headers(request: Request, call_next):
     if request.method == "OPTIONS":
@@ -130,15 +137,19 @@ def img_bytes(img, fmt, quality=85):
 
 
 def pil_to_docx(img) -> bytes:
-    """Embed a PIL image into a DOCX file."""
-    doc = DocxDocument()
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    doc.add_picture(buf, width=None)
-    out = io.BytesIO()
-    doc.save(out)
-    return out.getvalue()
+    if DocxDocument is None:
+        return b""
+    try:
+        doc = DocxDocument()
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        doc.add_picture(buf, width=None)
+        out = io.BytesIO()
+        doc.save(out)
+        return out.getvalue()
+    except:
+        return b""
 
 
 def make_file(name, fmt, data, label, category, page=None):
@@ -155,13 +166,13 @@ def image_outputs(img, prefix="", page_num=None):
     pg = f" · Page {page_num}" if page_num else ""
     p = f"p{page_num}_" if page_num else ""
 
-    # Resize large images to max 1200px wide to keep response small
+    # Resize if too large
     max_w = 1200
     if img.width > max_w:
         ratio = max_w / img.width
         img = img.resize((max_w, int(img.height * ratio)), Image_cls.LANCZOS)
 
-    # JPG quality variants (2 instead of 3)
+    # JPG variants
     for q, lbl in [(85,"High Quality"),(50,"Compressed")]:
         d = img_bytes(img, "JPEG", q)
         outputs.append(make_file(f"{p}jpg_{lbl.lower().replace(' ','_')}.jpg","JPG",d,f"JPG — {lbl}{pg}","JPG",page_num))
@@ -171,17 +182,18 @@ def image_outputs(img, prefix="", page_num=None):
         d = compress_to_target(img, "JPEG", kb)
         outputs.append(make_file(f"{p}jpg_under_{kb}kb.jpg","JPG",d,f"JPG — Under {kb}KB{pg}","JPG",page_num))
 
-    # PNG lossless
+    # PNG
     d = img_bytes(img, "PNG")
     outputs.append(make_file(f"{p}image.png","PNG",d,f"PNG — Lossless{pg}","PNG",page_num))
 
-    # WebP compressed
+    # WebP
     d = compress_to_target(img, "WEBP", 200)
     outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg}","WebP",page_num))
 
-    # DOCX with image embedded
+    # DOCX (only if library available)
     d = pil_to_docx(img)
-    outputs.append(make_file(f"{p}document.docx","DOCX",d,f"DOCX — Word Document{pg}","DOCX",page_num))
+    if d:
+        outputs.append(make_file(f"{p}document.docx","DOCX",d,f"DOCX — Word Document{pg}","DOCX",page_num))
 
     return outputs
 
@@ -193,7 +205,7 @@ def root(): return {"status": "AllFormatsReady API is live"}
 def health(): return {"status": "ok"}
 
 @app.get("/ping")
-def ping(): return {"ping": "pong"}  # keep-alive endpoint
+def ping(): return {"ping": "pong"}
 
 
 @app.post("/convert")
@@ -213,29 +225,25 @@ async def convert(file: UploadFile = File(...)):
     is_docx = ext in ["docx","doc"] or "wordprocessing" in (file.content_type or "")
     is_image = not is_pdf and not is_docx
 
-    # DOCX input not supported — requires LibreOffice (not available on free tier)
     if is_docx:
         raise HTTPException(
             status_code=400,
-            detail="DOCX upload is not supported yet. Please convert your Word document to PDF first, then upload the PDF."
+            detail="DOCX upload not supported. Please convert to PDF first, then upload."
         )
 
     elif is_pdf:
         doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
         total_pages = len(doc)
-        text = "".join(p.get_text() for p in doc)
+        text = "".join(pg.get_text() for pg in doc)
         sensitive = is_sensitive(filename, text)
 
-        # Compressed PDF (whole doc)
         outputs.append(make_file("compressed.pdf","PDF",compress_pdf(file_bytes),"Compressed PDF","PDF"))
 
-        # Masked PDF if Aadhaar/PAN detected
         if sensitive:
             try:
                 outputs.append(make_file("masked_aadhaar.pdf","PDF",mask_pdf(file_bytes),"Masked Aadhaar PDF","PDF"))
             except: pass
 
-        # Per-page image + docx outputs
         for i, page in enumerate(doc, 1):
             img = pdf_page_to_pil(page)
             pg = i if total_pages > 1 else None
@@ -250,8 +258,6 @@ async def convert(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Could not read image file.")
 
         outputs.extend(image_outputs(img))
-
-        # PDF from image
         raw_pdf = img_bytes(img, "PDF")
         outputs.append(make_file("image_as_pdf.pdf","PDF",raw_pdf,"PDF — From Image","PDF"))
         outputs.append(make_file("image_as_pdf_compressed.pdf","PDF",compress_pdf(raw_pdf),"PDF — Compressed","PDF"))
