@@ -969,8 +969,15 @@
     }, 1200);
 
     try {
+      // Smart compress large images before sending (min quality loss)
+      const fileToSend = await compressIfNeeded(selectedFile);
+      if(fileToSend !== selectedFile){
+        const origMB = (selectedFile.size/1024/1024).toFixed(1);
+        const newMB  = (fileToSend.size/1024/1024).toFixed(1);
+        progressLabel && (progressLabel.textContent = `Optimised ${origMB}MB → ${newMB}MB…`);
+      }
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", fileToSend);
       const res = await fetch(`${API_URL}/convert`, { method:"POST", body:formData });
       clearInterval(timer);
 
@@ -999,7 +1006,12 @@
       clearInterval(timer);
       progressWrap.classList.remove("show");
       btnConvert.disabled = false;
-      errorWrap.textContent = "⚠️ " + (err.message || "Something went wrong. Please try again.");
+      const msg = err.message || "";
+      if(msg.includes("fetch") || msg.includes("network") || msg.includes("Failed")){
+        errorWrap.textContent = "⚠️ Server is waking up (free tier). Please wait 30 seconds and try again.";
+      } else {
+        errorWrap.textContent = "⚠️ " + (msg || "Something went wrong. Please try again.");
+      }
       errorWrap.classList.add("show");
       stopTimer();
     }
