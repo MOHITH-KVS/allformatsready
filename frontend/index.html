@@ -5,8 +5,8 @@
   <meta name="google-site-verification" content="RTnFvMSc2n4XJRE71nlR9CG3ldH2CY5v56yuynn7qf8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AllFormatsReady – Upload Once, Get All Formats | Aadhaar, PAN, PDF Converter India</title>
-  <meta name="description" content="Upload your Aadhaar, PAN card or any document once and instantly get PDF, JPG, PNG, WebP in all sizes. Free online tool for Indian government forms, bank KYC, EPFO, UIDAI."/>
-  <meta name="keywords" content="compress aadhaar pdf, aadhaar card jpg under 200kb, pan card pdf to jpg, compress document for bank kyc, pdf to jpg india, aadhaar pdf compress online, epfo document upload, uidai document format"/>
+  <meta name="description" content="Upload any document or image once — get PDF compressed, JPG, PNG, WebP in all sizes instantly. Free Indian document converter for Aadhaar, PAN, Passport, bank KYC, EPFO, UIDAI, Income Tax. No sign-up needed."/>
+  <meta name="keywords" content="compress aadhaar pdf, aadhaar card jpg under 200kb, pan card pdf to jpg, compress document for bank kyc, pdf to jpg india, aadhaar pdf compress online, epfo document upload, uidai document format, convert pdf to jpg online free, document format converter india, pdf converter free india, image to pdf converter, compress pdf online free, jpg to pdf converter, png to jpg converter, document converter for government forms, passport photo converter, income tax document upload, compress image under 200kb"/>
   <meta name="robots" content="index, follow"/>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzI1NjNFQiIvPgogIDx0ZXh0IHg9IjQiIHk9IjIyIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSI+QUY8L3RleHQ+Cjwvc3ZnPg=="/>
   <link rel="canonical" href="https://allformatsready.vercel.app/"/>
@@ -34,7 +34,7 @@
     .badge{background:var(--brand-light);color:var(--brand);font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
     /* Header redesign */
     header{background:#fff;border-bottom:1px solid var(--gray-200);padding:10px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-    .header-pills{display:flex;gap:8px;flex:1;flex-wrap:wrap;justify-content:center}
+    .header-pills{display:flex;gap:8px;flex:1;flex-wrap:wrap;justify-content:center;overflow:hidden}
     .hpill{font-size:.72rem;font-weight:600;color:var(--gray-600);background:var(--gray-100);padding:4px 10px;border-radius:20px;white-space:nowrap}
     .header-badges{display:flex;gap:6px;flex-shrink:0}
     .badge-free{background:#DCFCE7;color:#15803D;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:20px}
@@ -235,7 +235,7 @@
     .preset-section{max-width:580px;margin:0 auto 0;padding:0 20px}
     .preset-label{font-size:.78rem;font-weight:700;color:var(--gray-600);margin-bottom:8px;display:flex;align-items:center;gap:6px}
     .preset-label span{background:var(--brand-light);color:var(--brand);font-size:.68rem;padding:1px 7px;border-radius:10px;font-weight:700}
-    .preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:20px}
+    .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
     .preset-btn{background:#fff;border:1.5px solid var(--gray-200);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;transition:all .15s;display:flex;flex-direction:column;gap:3px}
     .preset-btn:hover{border-color:var(--brand);background:var(--brand-light);transform:translateY(-1px);box-shadow:0 2px 8px rgba(37,99,235,.1)}
     .preset-btn.active{border-color:var(--brand);background:var(--brand-light)}
@@ -257,13 +257,53 @@
     .btn-whatsapp{background:#25D366;color:#fff;border:none;border-radius:9px;padding:10px 18px;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .15s,transform .1s;text-decoration:none}
     .btn-whatsapp:hover{background:#20BA5A;transform:translateY(-1px)}
     .btn-whatsapp svg{width:16px;height:16px;fill:#fff;flex-shrink:0}
-    @media(max-width:600px){
-      .cards-grid{grid-template-columns:1fr 1fr}
+    /* ── Full Mobile Responsive ── */
+    @media(max-width:768px){
+      /* Header */
+      header{padding:10px 12px;gap:8px}
+      .header-pills{display:none} /* hide pills on mobile — save space */
+      .logo{font-size:1rem}
+      /* Hero */
+      .hero{padding:28px 16px 20px}
+      .hero h1{font-size:1.5rem}
+      .hero p{font-size:.88rem}
+      .pills{gap:5px}
+      .pill{font-size:.72rem;padding:4px 10px}
+      /* Upload */
+      .upload-wrap{padding:0 12px}
+      .drop-zone{padding:28px 14px;margin:14px}
+      .drop-formats{gap:4px}
+      .drop-fmt{font-size:.65rem;padding:2px 6px}
+      .btn-convert{margin:12px 14px 0;width:calc(100% - 28px)}
+      .privacy-row{flex-direction:column;gap:8px;padding:10px 14px 16px}
+      /* Results */
+      .results{padding:0 12px}
+      .results-header{flex-direction:column;align-items:stretch;gap:10px}
+      .results-header>div:last-child{flex-direction:column;gap:8px}
+      .btn-new,.btn-zip,.btn-whatsapp{width:100%;justify-content:center}
+      /* Cards */
+      .cards-grid{grid-template-columns:1fr 1fr;gap:10px}
+      .file-card{padding:12px}
+      .card-label{font-size:.78rem}
+      /* Cat tabs */
+      .cat-tabs{gap:5px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
+      .cat-tab{white-space:nowrap;font-size:.74rem;padding:5px 12px;flex-shrink:0}
+      /* Preset grid */
+      .preset-grid{grid-template-columns:1fr 1fr}
+      .preset-btn{padding:8px 10px}
+      .preset-name{font-size:.74rem}
+      .preset-req{font-size:.64rem}
+      /* FAQ */
       .faq-grid{grid-template-columns:1fr}
-      .results-header{flex-direction:column}
+      .faq-section{padding:0 12px}
+      /* Floating timer */
+      .floating-timer{bottom:12px;right:12px;padding:10px 14px;min-width:160px}
+      .ft-num{font-size:1.1rem}
     }
     @media(max-width:400px){
       .cards-grid{grid-template-columns:1fr}
+      .hero h1{font-size:1.35rem}
+      .preset-grid{grid-template-columns:1fr 1fr}
     }
   </style>
 </head>
@@ -1083,9 +1123,6 @@
   </div>
 </div>
 
-<footer>
-  <strong>AllFormatsReady</strong> — Free document converter for Indian government forms & KYC<br>
-  Built for Aadhaar · PAN · Passport · Any document &nbsp;|&nbsp; 100% Free &nbsp;|&nbsp; No sign-up required
-</footer>
+
 </body>
 </html>
