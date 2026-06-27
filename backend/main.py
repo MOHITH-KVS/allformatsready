@@ -263,20 +263,16 @@ async def convert(request: Request, file: UploadFile = File(...)):
         text = "".join(pg.get_text() for pg in doc)
         sensitive = is_sensitive(filename, text)
 
-        # Compressed PDF (whole document)
         outputs.append(make_file("compressed.pdf","PDF",compress_pdf(file_bytes),"Compressed PDF","PDF"))
 
-        # Masked PDF if Aadhaar/PAN detected
         if sensitive:
             try:
                 outputs.append(make_file("masked_aadhaar.pdf","PDF",mask_pdf(file_bytes),"Masked Aadhaar PDF","PDF"))
             except: pass
 
-        # Convert all pages to PIL images
         all_page_imgs = []
         for i, page in enumerate(doc, 1):
             img = pdf_page_to_pil(page)
-            # Resize if needed
             max_w = 1200
             if img.width > max_w:
                 ratio = max_w / img.width
@@ -285,12 +281,10 @@ async def convert(request: Request, file: UploadFile = File(...)):
 
         doc.close()
 
-        # Generate per-page image outputs (JPG, PNG, WebP)
         for i, img in enumerate(all_page_imgs, 1):
             pg = i if total_pages > 1 else None
             outputs.extend(image_outputs(img, f"page{i}", pg))
 
-        # Generate ONE combined DOCX with ALL pages
         d = pil_to_docx(all_page_imgs)
         if d:
             label = f"DOCX — All {total_pages} Pages" if total_pages > 1 else "DOCX — Word Document"
@@ -304,14 +298,103 @@ async def convert(request: Request, file: UploadFile = File(...)):
 
         outputs.extend(image_outputs(img))
 
-        # PDF from image
         raw_pdf = img_bytes(img, "PDF")
         outputs.append(make_file("image_as_pdf.pdf","PDF",raw_pdf,"PDF — From Image","PDF"))
         outputs.append(make_file("image_as_pdf_compressed.pdf","PDF",compress_pdf(raw_pdf),"PDF — Compressed","PDF"))
 
-        # Single DOCX with image embedded
         d = pil_to_docx([img])
         if d:
             outputs.append(make_file("document.docx","DOCX",d,"DOCX — Word Document","DOCX"))
 
     return JSONResponse(content={"files": outputs, "total": len(outputs), "total_pages": total_pages})
+
+
+@app.post("/convert-multiple")
+@limiter.limit("5/minute")
+async def convert_multiple(request: Request, files: list[UploadFile] = File(...)):
+    """Accept multiple images → generate individual formats + one combined PDF + combined DOCX."""
+    load_libs()
+
+    if len(files) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 images at once.")
+
+    all_imgs = []
+    total_size = 0
+
+    for f in files:
+        file_bytes = await f.read()
+        total_size += len(file_bytes)
+        if total_size > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="Total size too large. Max 10MB total.")
+        try:
+            img = Image_cls.open(io.BytesIO(file_bytes)).convert("RGB")
+            # Resize if needed
+            max_w = 1200
+            if img.width > max_w:
+                ratio = max_w / img.width
+                img = img.resize((max_w, int(img.height * ratio)), Image_cls.LANCZOS)
+            all_imgs.append((f.filename or f"image_{len(all_imgs)+1}", img))
+        except:
+            raise HTTPException(status_code=400, detail=f"Could not read image: {f.filename}")
+
+    if not all_imgs:
+        raise HTTPException(status_code=400, detail="No valid images found.")
+
+    outputs = []
+    total_count = len(all_imgs)
+
+    # ── Per-image individual outputs ──
+    for i, (fname, img) in enumerate(all_imgs, 1):
+        pg = i if total_count > 1 else None
+        pg_label = f" · Image {i}" if total_count > 1 else ""
+        p = f"img{i}_" if total_count > 1 else ""
+
+        # JPG variants
+        for q, lbl in [(85,"High Quality"),(50,"Compressed")]:
+            d = img_bytes(img, "JPEG", q)
+            outputs.append(make_file(f"{p}jpg_{lbl.lower().replace(' ','_')}.jpg","JPG",d,f"JPG — {lbl}{pg_label}","JPG",pg))
+
+        # JPG size targets
+        for kb in [100, 200, 500]:
+            d = compress_to_target(img, "JPEG", kb)
+            outputs.append(make_file(f"{p}jpg_under_{kb}kb.jpg","JPG",d,f"JPG — Under {kb}KB{pg_label}","JPG",pg))
+
+        # PNG
+        d = img_bytes(img, "PNG")
+        outputs.append(make_file(f"{p}image.png","PNG",d,f"PNG — Lossless{pg_label}","PNG",pg))
+
+        # WebP
+        d = compress_to_target(img, "WEBP", 200)
+        outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg_label}","WebP",pg))
+
+        # Individual PDF
+        raw_pdf = img_bytes(img, "PDF")
+        outputs.append(make_file(f"{p}image_as_pdf.pdf","PDF",raw_pdf,f"PDF — Image {i}","PDF",pg))
+
+    # ── Combined PDF (all images in one PDF) ──
+    if total_count > 1:
+        imgs_only = [img for _, img in all_imgs]
+        # Use Pillow to save all images as multi-page PDF
+        buf = io.BytesIO()
+        imgs_only[0].save(buf, format="PDF", save_all=True, append_images=imgs_only[1:])
+        combined_pdf = buf.getvalue()
+        outputs.append(make_file(
+            "combined_all_images.pdf","PDF",
+            compress_pdf(combined_pdf),
+            f"PDF — All {total_count} Images Combined","PDF"
+        ))
+
+        # ── Combined DOCX (all images in one Word doc) ──
+        d = pil_to_docx(imgs_only)
+        if d:
+            outputs.append(make_file(
+                "combined_all_images.docx","DOCX",d,
+                f"DOCX — All {total_count} Images Combined","DOCX"
+            ))
+
+    return JSONResponse(content={
+        "files": outputs,
+        "total": len(outputs),
+        "total_pages": total_count,
+        "combined": total_count > 1
+    })
