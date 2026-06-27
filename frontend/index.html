@@ -617,6 +617,7 @@
 
   // ── State ──
   let selectedFile = null;
+  let selectedFiles = [];
   let allFiles = [];
   let activeCategory = "All";
   let timerInterval = null;
@@ -703,8 +704,63 @@
     multipageNotice.classList.toggle("show", isPDF(file.name));
   }
 
+  function setMultipleFiles(files) {
+    selectedFiles = Array.from(files);
+    selectedFile = selectedFiles[0];
+
+    // Validate total size
+    const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    if(totalSize > 15 * 1024 * 1024){
+      errorWrap.textContent = "⚠️ Total size too large. Maximum is 15MB across all files.";
+      errorWrap.classList.add("show");
+      fileInput.value = "";
+      return;
+    }
+
+    // Show chips
+    const multiPreview = document.getElementById("multiPreview");
+    multiPreview.innerHTML = "";
+    selectedFiles.forEach((f, i) => {
+      const chip = document.createElement("div");
+      chip.className = "multi-chip";
+      chip.innerHTML = `<span>${getFileIcon(f.name)}</span><span>${f.name}</span>
+        <button class="chip-remove" data-idx="${i}" title="Remove">✕</button>`;
+      multiPreview.appendChild(chip);
+    });
+    multiPreview.classList.add("show");
+
+    // Chip remove handlers
+    multiPreview.querySelectorAll(".chip-remove").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.dataset.idx);
+        selectedFiles.splice(idx, 1);
+        if(selectedFiles.length === 0){ reset(); return; }
+        if(selectedFiles.length === 1){ setFile(selectedFiles[0]); return; }
+        setMultipleFiles(selectedFiles);
+      });
+    });
+
+    // Show notice
+    const multiNotice = document.getElementById("multiNotice");
+    const multiNoticeText = document.getElementById("multiNoticeText");
+    if(multiNotice && multiNoticeText){
+      multiNoticeText.textContent = `${selectedFiles.length} images selected — will be combined into one PDF & DOCX too`;
+      multiNotice.classList.add("show");
+    }
+
+    filePreview.classList.remove("show");
+    dropZone.style.display = "none";
+    btnConvert.disabled = false;
+    errorWrap.classList.remove("show");
+    resultsSection.style.display = "none";
+    progressWrap.classList.remove("show");
+    sensitiveNotice.classList.remove("show");
+    multipageNotice.classList.remove("show");
+    clearPreset();
+  }
+
   function reset(){
-    selectedFile = null; allFiles = []; totalPages = 1;
+    selectedFile = null; selectedFiles = []; allFiles = []; totalPages = 1;
     fileInput.value = "";
     filePreview.classList.remove("show");
     sensitiveNotice.classList.remove("show");
@@ -718,6 +774,10 @@
     progressFill.style.width = "0%";
     stopTimer();
     document.querySelectorAll(".progress-step").forEach(s => s.classList.remove("active","done"));
+    const mp = document.getElementById("multiPreview");
+    if(mp){ mp.innerHTML = ""; mp.classList.remove("show"); }
+    const mn = document.getElementById("multiNotice");
+    if(mn) mn.classList.remove("show");
   }
 
   fileInput.addEventListener("change", () => {
