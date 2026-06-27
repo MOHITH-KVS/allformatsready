@@ -257,8 +257,56 @@
     .btn-whatsapp{background:#25D366;color:#fff;border:none;border-radius:9px;padding:10px 18px;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .15s,transform .1s;text-decoration:none}
     .btn-whatsapp:hover{background:#20BA5A;transform:translateY(-1px)}
     .btn-whatsapp svg{width:16px;height:16px;fill:#fff;flex-shrink:0}
+
+    /* Extension promo banner */
+    .ext-promo{
+      max-width:580px;margin:0 auto 24px;padding:0 20px;
+    }
+    .ext-promo-card{
+      background:linear-gradient(135deg,#1D4ED8,#2563EB);
+      border-radius:14px;padding:18px 20px;
+      display:flex;align-items:center;gap:14px;
+      box-shadow:0 4px 20px rgba(37,99,235,.3);
+    }
+    .ext-promo-icon{font-size:2rem;flex-shrink:0}
+    .ext-promo-text{flex:1}
+    .ext-promo-title{font-size:.9rem;font-weight:800;color:#fff;margin-bottom:3px}
+    .ext-promo-sub{font-size:.75rem;color:#BFDBFE;line-height:1.4}
+    .btn-ext{
+      background:#fff;color:var(--brand);border:none;border-radius:8px;
+      padding:9px 16px;font-size:.78rem;font-weight:800;cursor:pointer;
+      white-space:nowrap;flex-shrink:0;text-decoration:none;display:inline-block;
+      transition:transform .15s,box-shadow .15s;
+    }
+    .btn-ext:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+
+    /* How to use guide */
+    .how-section{max-width:580px;margin:0 auto 40px;padding:0 20px}
+    .how-title{font-size:1rem;font-weight:800;color:var(--gray-900);margin-bottom:16px;text-align:center}
+    .how-steps{display:flex;flex-direction:column;gap:10px}
+    .how-step{
+      background:#fff;border:1.5px solid var(--gray-200);border-radius:10px;
+      padding:12px 14px;display:flex;align-items:flex-start;gap:12px;
+    }
+    .how-step-num{
+      background:var(--brand);color:#fff;font-size:.72rem;font-weight:800;
+      width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+      justify-content:center;flex-shrink:0;margin-top:1px;
+    }
+    .how-step-content{}
+    .how-step-title{font-size:.85rem;font-weight:700;color:var(--gray-800);margin-bottom:2px}
+    .how-step-desc{font-size:.78rem;color:var(--gray-500);line-height:1.5}
+    .how-step-tip{
+      display:inline-block;margin-top:4px;
+      background:var(--brand-light);color:var(--brand);
+      font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:10px;
+    }
     /* ── Full Mobile Responsive ── */
     @media(max-width:768px){
+      .ext-promo{padding:0 12px}
+      .ext-promo-card{flex-direction:column;text-align:center;gap:10px}
+      .btn-ext{width:100%;text-align:center}
+      .how-section{padding:0 12px}
       /* Header */
       header{padding:10px 12px;gap:8px}
       .header-pills{display:none} /* hide pills on mobile — save space */
@@ -336,6 +384,19 @@
     <div class="pill"><strong>Masked</strong> Aadhaar PDF</div>
   </div>
 </section>
+
+
+<!-- Extension Promo Banner -->
+<div class="ext-promo">
+  <div class="ext-promo-card">
+    <div class="ext-promo-icon">🧩</div>
+    <div class="ext-promo-text">
+      <div class="ext-promo-title">Use it directly on any portal — Chrome Extension</div>
+      <div class="ext-promo-sub">Auto-detects EPFO, Bank KYC, UIDAI & 20+ portals. Convert without switching tabs.</div>
+    </div>
+    <a class="btn-ext" href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" rel="noopener">⬇ Download Free →</a>
+  </div>
+</div>
 
 <!-- Upload -->
 <div class="upload-wrap">
@@ -444,6 +505,51 @@
   <div class="cat-tabs" id="catTabs"></div>
   <div class="cards-grid" id="cardsGrid"></div>
 </div>
+
+<!-- How to use -->
+<section class="how-section" id="how-to-use">
+  <div class="how-title">How to use AllFormatsReady</div>
+  <div class="how-steps">
+    <div class="how-step">
+      <div class="how-step-num">1</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Upload your document</div>
+        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, JPG, PNG, WebP, HEIC — up to 15MB.</div>
+        <span class="how-step-tip">💡 Works with Aadhaar, PAN, Passport, certificates, and any image</span>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">2</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Click "Generate All Formats"</div>
+        <div class="how-step-desc">All versions are created simultaneously — PDF compressed, JPG in 3 sizes, PNG lossless, WebP, DOCX. Takes 5-15 seconds.</div>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">3</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Choose your portal (optional)</div>
+        <div class="how-step-desc">Click EPFO, Bank KYC, UIDAI or any portal — the right format gets highlighted at top automatically.</div>
+        <span class="how-step-tip">💡 12 Indian government and banking portals supported</span>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">4</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Download only what you need</div>
+        <div class="how-step-desc">Click any individual file card to download just that format. Or use "Download All as ZIP" to get everything at once.</div>
+      </div>
+    </div>
+    <div class="how-step" style="border-color:#BFDBFE;background:#EFF6FF">
+      <div class="how-step-num" style="background:#1D4ED8">🧩</div>
+      <div class="how-step-content">
+        <div class="how-step-title" style="color:#1E40AF">Pro tip — Use the Chrome Extension!</div>
+        <div class="how-step-desc" style="color:#3B82F6">Install our free Chrome extension and convert documents directly while filling any form — without switching tabs. Auto-detects EPFO, Bank KYC, UIDAI, Naukri, LinkedIn and 20+ more portals.</div>
+        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ Download Extension Free →</a>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- FAQ -->
 <section class="faq-section">
@@ -912,11 +1018,19 @@
 
   // ── WhatsApp Share ──
   function updateWhatsAppLink(){
+    const filesCount = allFiles.length || 0;
     const text = encodeURIComponent(
-      "🚀 Found this free tool — AllFormatsReady!\n\n" +
-      "Upload your Aadhaar, PAN or any document ONCE and get ALL formats instantly — PDF, JPG, PNG, WebP in every size.\n\n" +
-      "Perfect for government forms, bank KYC, EPFO uploads.\n\n" +
-      "👉 Try it free: https://allformatsready.vercel.app"
+      "🔥 *AllFormatsReady* — Game changer for government forms!\n\n" +
+      "Upload Aadhaar/PAN/any document ONCE → get ALL formats instantly\n" +
+      "✅ PDF compressed\n" +
+      "✅ JPG under 100KB, 200KB, 500KB\n" +
+      "✅ PNG, WebP, DOCX\n" +
+      "✅ Masked Aadhaar PDF (auto-generated)\n" +
+      "✅ Works for EPFO, Bank KYC, UIDAI, Passport, Income Tax\n\n" +
+      "🧩 *Chrome Extension available* — converts while you fill forms, no tab switching!\n\n" +
+      "👉 Try FREE: https://allformatsready.vercel.app\n\n" +
+      "🧩 Download Chrome Extension: https://github.com/MOHITH-KVS/allformatsready/releases\n\n" +
+      "No sign-up. No watermark. Files deleted in 60 seconds. 🔒"
     );
     const btn = document.getElementById("btnWhatsApp");
     if(btn) btn.href = `https://wa.me/?text=${text}`;
