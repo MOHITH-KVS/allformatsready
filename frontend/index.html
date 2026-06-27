@@ -468,6 +468,7 @@
       <div class="progress-step" data-step="4"><div class="step-dot"></div>Packaging everything</div>
     </div>
     <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div id="progressLabel" style="font-size:.75rem;color:var(--gray-500);text-align:center;margin-top:4px;min-height:16px"></div>
   </div>
 
   <button class="btn-convert" id="btnConvert" disabled>Generate All Formats →</button>
@@ -638,6 +639,7 @@
   const btnConvert      = document.getElementById("btnConvert");
   const progressWrap    = document.getElementById("progressWrap");
   const progressFill    = document.getElementById("progressFill");
+  const progressLabel   = document.getElementById("progressLabel");
   const errorWrap       = document.getElementById("errorWrap");
   const resultsSection  = document.getElementById("resultsSection");
   const resultsSub      = document.getElementById("resultsSub");
