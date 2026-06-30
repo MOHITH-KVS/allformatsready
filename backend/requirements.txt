@@ -1,10 +1,11 @@
+quirements · TXT
 fastapi==0.115.0
 uvicorn[standard]==0.34.0
 python-multipart==0.0.12
 PyMuPDF==1.24.10
 Pillow==11.1.0
 python-docx==1.1.2
-pillow-heif==0.21.0
+pillow-heif==0.20.0
 slowapi==0.1.9
 psd-tools==1.9.34
 svglib==1.5.1
