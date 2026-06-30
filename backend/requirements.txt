@@ -6,3 +6,6 @@ Pillow==11.1.0
 python-docx==1.1.2
 pillow-heif==0.18.0
 slowapi==0.1.9
+psd-tools==1.9.34
+svglib==1.5.1
+reportlab==4.2.5

@@ -14,9 +14,12 @@ from slowapi.errors import RateLimitExceeded
 fitz_mod = None
 Image_cls = None
 DocxDocument = None
+psd_open = None
+svg2rlg = None
+renderPM = None
 
 def load_libs():
-    global fitz_mod, Image_cls, DocxDocument
+    global fitz_mod, Image_cls, DocxDocument, psd_open, svg2rlg, renderPM
     if fitz_mod is None:
         import fitz as _fitz
         fitz_mod = _fitz
@@ -35,6 +38,20 @@ def load_libs():
             DocxDocument = _Doc
         except:
             DocxDocument = None
+    if psd_open is None:
+        try:
+            from psd_tools import PSDImage as _PSDImage
+            psd_open = _PSDImage.open
+        except:
+            psd_open = False
+    if svg2rlg is None:
+        try:
+            from svglib.svglib import svg2rlg as _svg2rlg
+            from reportlab.graphics import renderPM as _renderPM
+            svg2rlg = _svg2rlg
+            renderPM = _renderPM
+        except:
+            svg2rlg = False
 
 @asynccontextmanager
 async def lifespan(app):
@@ -180,6 +197,65 @@ def pil_to_docx(imgs) -> bytes:
         return b""
 
 
+def psd_to_pil(file_bytes):
+    """Convert PSD bytes to a flattened PIL RGB image."""
+    psd = psd_open(io.BytesIO(file_bytes))
+    img = psd.composite()  # flattens all visible layers
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    return img
+
+
+def svg_to_pil(file_bytes):
+    """Convert SVG bytes to a PIL RGB image via svglib + reportlab."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+    try:
+        drawing = svg2rlg(tmp_path)
+        png_buf = io.BytesIO()
+        renderPM.drawToFile(drawing, png_buf, fmt="PNG")
+        png_buf.seek(0)
+        img = Image_cls.open(png_buf)
+        if img.mode in ("RGBA", "P"):
+            bg = Image_cls.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[-1])
+            img = bg
+        else:
+            img = img.convert("RGB")
+        return img
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+
+
+def open_any_image(file_bytes, ext, content_type):
+    """Open an image of any supported format (incl. GIF/BMP/TIFF/PSD/SVG) as a flattened PIL RGB image."""
+    is_psd = ext == "psd" or "photoshop" in (content_type or "")
+    is_svg = ext == "svg" or "svg" in (content_type or "")
+
+    if is_psd:
+        if not psd_open:
+            raise HTTPException(status_code=400, detail="PSD support is currently unavailable.")
+        return psd_to_pil(file_bytes)
+
+    if is_svg:
+        if not svg2rlg:
+            raise HTTPException(status_code=400, detail="SVG support is currently unavailable.")
+        return svg_to_pil(file_bytes)
+
+    # GIF / BMP / TIFF / JPG / PNG / WEBP / HEIC all handled natively by Pillow
+    img = Image_cls.open(io.BytesIO(file_bytes))
+    if getattr(img, "is_animated", False):
+        img.seek(0)  # use first frame for animated GIFs
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    return img
+
+
 def make_file(name, fmt, data, label, category, page=None):
     return {
         "name": name, "format": fmt, "label": label,
@@ -248,7 +324,6 @@ async def convert(request: Request, file: UploadFile = File(...)):
 
     is_pdf = ext == "pdf" or "pdf" in (file.content_type or "")
     is_docx = ext in ["docx","doc"] or "wordprocessing" in (file.content_type or "")
-    is_heic = ext in ["heic","heif"] or "heic" in (file.content_type or "") or "heif" in (file.content_type or "")
     is_image = not is_pdf and not is_docx
 
     if is_docx:
@@ -292,7 +367,9 @@ async def convert(request: Request, file: UploadFile = File(...)):
 
     elif is_image:
         try:
-            img = Image_cls.open(io.BytesIO(file_bytes)).convert("RGB")
+            img = open_any_image(file_bytes, ext, file.content_type)
+        except HTTPException:
+            raise
         except:
             raise HTTPException(status_code=400, detail="Could not read image file.")
 
@@ -326,14 +403,18 @@ async def convert_multiple(request: Request, files: list[UploadFile] = File(...)
         total_size += len(file_bytes)
         if total_size > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail="Total size too large. Max 10MB total.")
+        fname = f.filename or ""
+        f_ext = fname.lower().rsplit(".", 1)[-1] if "." in fname else ""
         try:
-            img = Image_cls.open(io.BytesIO(file_bytes)).convert("RGB")
+            img = open_any_image(file_bytes, f_ext, f.content_type)
             # Resize if needed
             max_w = 1200
             if img.width > max_w:
                 ratio = max_w / img.width
                 img = img.resize((max_w, int(img.height * ratio)), Image_cls.LANCZOS)
-            all_imgs.append((f.filename or f"image_{len(all_imgs)+1}", img))
+            all_imgs.append((fname or f"image_{len(all_imgs)+1}", img))
+        except HTTPException:
+            raise
         except:
             raise HTTPException(status_code=400, detail=f"Could not read image: {f.filename}")
 
