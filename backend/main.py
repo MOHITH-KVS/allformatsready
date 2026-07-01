@@ -295,6 +295,31 @@ def image_outputs(img, prefix="", page_num=None):
     d = compress_to_target(img, "WEBP", 200)
     outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg}","WebP",page_num))
 
+    # GIF
+    buf = io.BytesIO()
+    img.save(buf, format="GIF")
+    outputs.append(make_file(f"{p}image.gif","GIF",buf.getvalue(),f"GIF{pg}","GIF",page_num))
+
+    # BMP
+    buf = io.BytesIO()
+    img.save(buf, format="BMP")
+    outputs.append(make_file(f"{p}image.bmp","BMP",buf.getvalue(),f"BMP — Bitmap{pg}","BMP",page_num))
+
+    # TIFF
+    buf = io.BytesIO()
+    img.save(buf, format="TIFF")
+    outputs.append(make_file(f"{p}image.tiff","TIFF",buf.getvalue(),f"TIFF — Lossless{pg}","TIFF",page_num))
+
+    # ICO
+    try:
+        ico_img = img.copy()
+        ico_img.thumbnail((256, 256), Image_cls.LANCZOS)
+        buf = io.BytesIO()
+        ico_img.save(buf, format="ICO", sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])
+        outputs.append(make_file(f"{p}image.ico","ICO",buf.getvalue(),f"ICO — Favicon{pg}","ICO",page_num))
+    except:
+        pass
+
     return outputs
 
 
