@@ -42,11 +42,23 @@ function getFileIcon(name) {
   if (ext === "pdf") return "📋";
   if (["jpg","jpeg"].includes(ext)) return "📷";
   if (ext === "png") return "🖼️";
+  if (ext === "gif") return "🎞️";
+  if (ext === "bmp") return "🖼️";
+  if (["tiff","tif"].includes(ext)) return "🗂️";
+  if (ext === "svg") return "✏️";
+  if (ext === "psd") return "🎨";
+  if (ext === "ico") return "🔷";
+  if (ext === "webp") return "🌐";
+  if (["heic","heif"].includes(ext)) return "📱";
   return "📄";
 }
 
 function fmtClass(fmt) {
-  const m = {JPG:"fmt-jpg",PNG:"fmt-png",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx"};
+  const m = {
+    JPG:"fmt-jpg", PNG:"fmt-png", WEBP:"fmt-webp",
+    PDF:"fmt-pdf", DOCX:"fmt-docx",
+    GIF:"fmt-gif", BMP:"fmt-bmp", TIFF:"fmt-tiff", ICO:"fmt-ico"
+  };
   return m[fmt.toUpperCase()] || "fmt-jpg";
 }
 
