@@ -155,6 +155,10 @@
     .fmt-webp{background:#EDE9FE;color:#4C1D95}
     .fmt-pdf{background:#FEE2E2;color:#991B1B}
     .fmt-docx{background:#DBEAFE;color:#1E40AF}
+    .fmt-gif{background:#FFF7ED;color:#C2410C}
+    .fmt-bmp{background:#F0FDF4;color:#166534}
+    .fmt-tiff{background:#F0F9FF;color:#075985}
+    .fmt-ico{background:#FDF4FF;color:#7E22CE}
     .card-label{font-size:.83rem;font-weight:700;color:var(--gray-800);line-height:1.3;flex:1}
     .card-page-tag{font-size:.68rem;color:var(--gray-500);background:var(--gray-100);padding:1px 7px;border-radius:10px;align-self:flex-start}
     .masked-tag{font-size:.68rem;background:#FED7AA;color:#92400E;padding:2px 8px;border-radius:10px;font-weight:700;align-self:flex-start;display:flex;align-items:center;gap:3px}
@@ -408,7 +412,7 @@
 <div class="upload-wrap">
 <div class="card" id="uploadCard">
   <div class="drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif" multiple/>
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif,.svg,.psd" multiple/>
     <span class="drop-icon">📂</span>
     <div class="drop-title">Drop your document here or click to browse</div>
     <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 15MB · Select multiple images at once</div>
@@ -675,7 +679,7 @@
   }
 
   function fmtBadgeClass(fmt){
-    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx"};
+    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx",GIF:"fmt-gif",BMP:"fmt-bmp",TIFF:"fmt-tiff",ICO:"fmt-ico"};
     return m[fmt] || "fmt-jpg";
   }
 
