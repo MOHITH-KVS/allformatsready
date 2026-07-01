@@ -131,6 +131,8 @@
     .results-title-wrap{}
     .results-title{font-size:1.1rem;font-weight:800;color:var(--gray-900)}
     .results-sub{font-size:.82rem;color:var(--gray-500);margin-top:2px}
+    .size-summary{display:flex;align-items:center;gap:8px;background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:#166534;font-weight:600}
+    .size-summary-icon{font-size:1rem;flex-shrink:0}
     .btn-zip{background:var(--gray-900);color:#fff;border:none;border-radius:9px;padding:10px 20px;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .15s,transform .1s}
     .btn-zip:hover{background:#000;transform:translateY(-1px)}
     .btn-new{background:#fff;color:var(--brand);border:1.5px solid var(--brand);border-radius:9px;padding:9px 18px;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .15s}
@@ -515,6 +517,10 @@
     </div>
   </div>
   <!-- Portal presets INSIDE results -->
+  <div class="size-summary" id="sizeSummary" style="display:none">
+    <span class="size-summary-icon">📦</span>
+    <span id="sizeSummaryText"></span>
+  </div>
   <div class="preset-section" id="presetSection">
     <div class="preset-label">🏛 Choose your portal to highlight the right files <span>NEW</span></div>
     <div class="preset-grid" id="presetGrid"></div>
@@ -781,6 +787,8 @@
     if(mp){ mp.innerHTML = ""; mp.classList.remove("show"); }
     const mn = document.getElementById("multiNotice");
     if(mn) mn.classList.remove("show");
+    const ss = document.getElementById("sizeSummary");
+    if(ss) ss.style.display = "none";
   }
 
   fileInput.addEventListener("change", () => {
@@ -1299,6 +1307,25 @@
     resultsSection.style.display = "block";
     const pageText = totalPages > 1 ? ` · ${totalPages} pages converted` : "";
     resultsSub.textContent = `${allFiles.length} files generated${pageText} — download only what you need`;
+
+    // ── Before/After size summary ──
+    const sizeSummary = document.getElementById("sizeSummary");
+    const sizeSummaryText = document.getElementById("sizeSummaryText");
+    if(selectedFile && allFiles.length){
+      const origBytes = selectedFile.size;
+      const bestBytes = Math.min(...allFiles.map(f => f.size_bytes));
+      const origMB = origBytes >= 1048576 ? (origBytes/1048576).toFixed(1)+"MB" : (origBytes/1024).toFixed(0)+"KB";
+      const bestKB = bestBytes >= 1048576 ? (bestBytes/1048576).toFixed(1)+"MB" : (bestBytes/1024).toFixed(0)+"KB";
+      const saved = Math.round((1 - bestBytes/origBytes)*100);
+      if(saved > 0){
+        sizeSummaryText.textContent = `Original: ${origMB} → Best result: ${bestKB} (${saved}% smaller)`;
+        sizeSummary.style.display = "flex";
+      } else {
+        sizeSummary.style.display = "none";
+      }
+    } else {
+      sizeSummary.style.display = "none";
+    }
 
     const cats = ["All", ...new Set(allFiles.map(f => f.category))];
     catTabs.innerHTML = "";
