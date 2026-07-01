@@ -257,6 +257,19 @@ function showResults() {
 
   cardsList.innerHTML = "";
 
+  // Auto-fill button — shown at top of results
+  const autoFillBtn = document.createElement("button");
+  autoFillBtn.id = "btnAutoFill";
+  autoFillBtn.style.cssText = `
+    display:block;width:100%;margin-bottom:10px;padding:9px;
+    background:#2563EB;color:#fff;border:none;border-radius:8px;
+    font-size:.78rem;font-weight:700;cursor:pointer;
+  `;
+  autoFillBtn.textContent = "⬆ Auto-fill on this page";
+  autoFillBtn.title = "Click to pick which converted file to inject into the portal's file input";
+  autoFillBtn.addEventListener("click", () => showAutoFillPicker(recommended.length > 0 ? recommended : others));
+  cardsList.appendChild(autoFillBtn);
+
   // Recommended section
   if (recommended.length > 0) {
     const recLabel = document.createElement("div");
@@ -351,7 +364,97 @@ btnZip.addEventListener("click", async () => {
   URL.revokeObjectURL(url);
 });
 
+// ── Auto-fill picker ──
+function showAutoFillPicker(files) {
+  // Remove existing picker if any
+  const existing = document.getElementById("autoFillPicker");
+  if (existing) { existing.remove(); return; }
+
+  const picker = document.createElement("div");
+  picker.id = "autoFillPicker";
+  picker.style.cssText = `
+    background:#F9FAFB;border:1.5px solid #BFDBFE;border-radius:8px;
+    padding:10px;margin-bottom:8px;
+  `;
+
+  const title = document.createElement("div");
+  title.style.cssText = "font-size:.72rem;font-weight:700;color:#1D4ED8;margin-bottom:8px;";
+  title.textContent = "Select file to auto-fill on this page:";
+  picker.appendChild(title);
+
+  // Show top 5 files to keep picker compact
+  const topFiles = files.slice(0, 5);
+  topFiles.forEach(f => {
+    const btn = document.createElement("button");
+    btn.style.cssText = `
+      display:block;width:100%;text-align:left;padding:6px 8px;margin-bottom:4px;
+      background:#fff;border:1px solid #E5E7EB;border-radius:6px;
+      font-size:.72rem;font-weight:600;color:#1F2937;cursor:pointer;
+    `;
+    btn.textContent = `${f.format} — ${f.label} (${f.size_kb}KB)`;
+    btn.addEventListener("mouseenter", () => btn.style.background = "#EFF6FF");
+    btn.addEventListener("mouseleave", () => btn.style.background = "#fff");
+    btn.addEventListener("click", async () => {
+      picker.remove();
+
+      // Get mime type
+      const mimeMap = {
+        jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png",
+        webp:"image/webp", pdf:"application/pdf",
+        docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        gif:"image/gif", bmp:"image/bmp", tiff:"image/tiff", ico:"image/x-icon"
+      };
+      const ext = f.name.split(".").pop().toLowerCase();
+      const mime = mimeMap[ext] || "application/octet-stream";
+
+      // Send to content script
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      chrome.tabs.sendMessage(tab.id, {
+        action: "INJECT_FILE",
+        file: { name: f.name, data_b64: f.data_b64, format: f.format, mime }
+      }, (res) => {
+        if (chrome.runtime.lastError || !res) {
+          // Content script not ready on this page
+          alert("⚠️ Cannot auto-fill on this page. Please download the file and upload manually.");
+          return;
+        }
+        if (res.count === 0) {
+          alert("⚠️ No file upload fields found on this page.");
+        }
+      });
+    });
+    picker.appendChild(btn);
+  });
+
+  const cancel = document.createElement("button");
+  cancel.style.cssText = `
+    display:block;width:100%;padding:5px;margin-top:4px;
+    background:none;border:none;font-size:.7rem;color:#6B7280;cursor:pointer;
+  `;
+  cancel.textContent = "✕ Cancel";
+  cancel.addEventListener("click", () => picker.remove());
+  picker.appendChild(cancel);
+
+  // Insert picker above the auto-fill button
+  const autoFillBtn = document.getElementById("btnAutoFill");
+  cardsList.insertBefore(picker, autoFillBtn);
+}
+
 // ── Init ──
+// Listen for fill success from content script
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.action === "FILL_SUCCESS") {
+    const btn = document.getElementById("btnAutoFill");
+    if (btn) {
+      btn.textContent = "✅ File injected successfully!";
+      btn.style.background = "#16A34A";
+      setTimeout(() => {
+        btn.textContent = "⬆ Auto-fill on this page";
+        btn.style.background = "#2563EB";
+      }, 3000);
+    }
+  }
+});
 detectCurrentPortal();
 // Keep backend awake
 fetch(API_URL + "/ping").catch(() => {});
