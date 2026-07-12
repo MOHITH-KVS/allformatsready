@@ -363,7 +363,8 @@ async def convert(request: Request, file: UploadFile = File(...)):
         text = "".join(pg.get_text() for pg in doc)
         sensitive = is_sensitive(filename, text)
 
-        outputs.append(make_file("compressed.pdf","PDF",compress_pdf(file_bytes),"Compressed PDF","PDF"))
+        outputs.append(make_file("original.pdf","PDF",file_bytes,"PDF — Original","PDF"))
+        outputs.append(make_file("compressed.pdf","PDF",compress_pdf(file_bytes),"PDF — Compressed","PDF"))
 
         if sensitive:
             try:
@@ -473,21 +474,26 @@ async def convert_multiple(request: Request, files: list[UploadFile] = File(...)
         d = compress_to_target(img, "WEBP", 200)
         outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg_label}","WebP",pg))
 
-        # Individual PDF
+        # Individual PDF — normal + compressed
         raw_pdf = img_bytes(img, "PDF")
         outputs.append(make_file(f"{p}image_as_pdf.pdf","PDF",raw_pdf,f"PDF — Image {i}","PDF",pg))
+        outputs.append(make_file(f"{p}image_as_pdf_compressed.pdf","PDF",compress_pdf(raw_pdf),f"PDF — Image {i} Compressed","PDF",pg))
 
     # ── Combined PDF (all images in one PDF) ──
     if total_count > 1:
         imgs_only = [img for _, img in all_imgs]
-        # Use Pillow to save all images as multi-page PDF
         buf = io.BytesIO()
         imgs_only[0].save(buf, format="PDF", save_all=True, append_images=imgs_only[1:])
         combined_pdf = buf.getvalue()
         outputs.append(make_file(
             "combined_all_images.pdf","PDF",
-            compress_pdf(combined_pdf),
+            combined_pdf,
             f"PDF — All {total_count} Images Combined","PDF"
+        ))
+        outputs.append(make_file(
+            "combined_all_images_compressed.pdf","PDF",
+            compress_pdf(combined_pdf),
+            f"PDF — All {total_count} Images Compressed","PDF"
         ))
 
         # ── Combined DOCX (all images in one Word doc) ──
