@@ -4,6 +4,14 @@
   <meta charset="UTF-8"/>
   <meta name="google-site-verification" content="RTnFvMSc2n4XJRE71nlR9CG3ldH2CY5v56yuynn7qf8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YS1K930FKD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-YS1K930FKD');
+  </script>
   <title>AllFormatsReady – Upload Once, Get All Formats | Aadhaar, PAN, PDF Converter India</title>
   <meta name="description" content="Upload any document or image once — get PDF compressed, JPG, PNG, WebP in all sizes instantly. Free Indian document converter for Aadhaar, PAN, Passport, bank KYC, EPFO, UIDAI, Income Tax. No sign-up needed."/>
   <meta name="keywords" content="compress aadhaar pdf, aadhaar card jpg under 200kb, pan card pdf to jpg, compress document for bank kyc, pdf to jpg india, aadhaar pdf compress online, epfo document upload, uidai document format, convert pdf to jpg online free, document format converter india, pdf converter free india, image to pdf converter, compress pdf online free, jpg to pdf converter, png to jpg converter, document converter for government forms, passport photo converter, income tax document upload, compress image under 200kb"/>
@@ -933,6 +941,8 @@
         const a = document.createElement("a");
         a.href=url; a.download=name; a.click();
         URL.revokeObjectURL(url);
+        // GA: track download
+        gtag('event', 'download', { format: ext.toUpperCase(), file_name: name });
       });
     });
 
@@ -1067,6 +1077,8 @@
       clearPreset(); return;
     }
     activePreset = portal.id;
+    // GA: track preset click
+    gtag('event', 'preset_click', { portal: portal.id, portal_name: portal.name });
 
     // Update tab styles
     document.querySelectorAll(".preset-btn").forEach(b => b.classList.toggle("active", b.dataset.id === portal.id));
@@ -1154,6 +1166,8 @@
     const a = document.createElement("a");
     a.href=url; a.download="allformatsready.zip"; a.click();
     URL.revokeObjectURL(url);
+    // GA: track ZIP download
+    gtag('event', 'download_zip', { file_count: allFiles.length });
   });
 
 
@@ -1275,6 +1289,10 @@
       const data = await res.json();
       allFiles = data.files;
       totalPages = data.total_pages || 1;
+
+      // GA: track conversion
+      const ext = selectedFile ? selectedFile.name.split(".").pop().toLowerCase() : "unknown";
+      gtag('event', 'convert', { file_type: ext, file_count: allFiles.length });
 
       progressFill.style.width = "100%";
       setStep(STEPS.length);
