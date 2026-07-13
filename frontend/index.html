@@ -414,7 +414,52 @@
       <div class="ext-promo-title">Use it directly on any portal — Chrome Extension</div>
       <div class="ext-promo-sub">Auto-detects EPFO, Bank KYC, UIDAI & 20+ portals. Convert without switching tabs.</div>
     </div>
-    <a class="btn-ext" href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" rel="noopener">⬇ Download Free →</a>
+    <button class="btn-ext" id="btnExtDownload" onclick="downloadExtension()">⬇ Download Free →</button>
+  </div>
+</div>
+
+<!-- Extension download success modal -->
+<div id="extModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <button onclick="closeExtModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9CA3AF">✕</button>
+
+    <!-- Success message -->
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:2.5rem;margin-bottom:10px">🎉</div>
+      <div style="font-size:1.1rem;font-weight:800;color:#1F2937;margin-bottom:6px">Extension downloaded! You're ahead of the curve.</div>
+      <div style="font-size:.84rem;color:#6B7280;line-height:1.5">Most people waste 30 minutes converting documents. You just found the shortcut. Now set it up in 60 seconds 👇</div>
+    </div>
+
+    <!-- How to setup -->
+    <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:14px;margin-bottom:18px">
+      <div style="font-size:.82rem;font-weight:800;color:#166534;margin-bottom:10px">⚡ Setup in 3 steps (60 seconds)</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:#1F2937">
+          <span style="background:#16A34A;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">1</span>
+          <span>Open Chrome → go to <strong>chrome://extensions</strong> → enable <strong>Developer mode</strong> (top right toggle)</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:#1F2937">
+          <span style="background:#16A34A;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">2</span>
+          <span>Click <strong>Load unpacked</strong> → select the <strong>extension</strong> folder from the ZIP you just downloaded</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:#1F2937">
+          <span style="background:#16A34A;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">3</span>
+          <span>Pin it to your Chrome toolbar → open any government portal → click the 🧩 icon → done!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share with friends -->
+    <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:8px">🙌 Share with friends who struggle with document formats:</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="shareWhatsApp()" style="flex:1;min-width:120px;padding:9px 10px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">📱 WhatsApp</button>
+      <button onclick="shareInstagram()" style="flex:1;min-width:120px;padding:9px 10px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">📸 Instagram</button>
+      <button onclick="shareLinkedIn()" style="flex:1;min-width:120px;padding:9px 10px;background:#0A66C2;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">💼 LinkedIn</button>
+    </div>
+
+    <div style="text-align:center;margin-top:14px">
+      <a href="#ext-setup-guide" onclick="closeExtModal()" style="font-size:.76rem;color:#2563EB;font-weight:600;text-decoration:none">📖 View detailed setup guide below ↓</a>
+    </div>
   </div>
 </div>
 
@@ -588,6 +633,54 @@
   <div class="faq-section-title">Common questions</div>
   <div class="faq-section-sub">Everything you need to know about AllFormatsReady</div>
   <div class="faq-grid" id="faqGrid"></div>
+</section>
+
+<!-- Extension Setup Guide -->
+<section id="ext-setup-guide" style="max-width:620px;margin:0 auto 48px;padding:0 20px">
+  <div style="text-align:center;margin-bottom:20px">
+    <div style="font-size:1.25rem;font-weight:800;color:#1F2937;margin-bottom:6px">🧩 How to install the Chrome Extension</div>
+    <div style="font-size:.85rem;color:#6B7280">Takes less than 60 seconds. No Chrome Web Store needed.</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
+      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">1</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Download the extension ZIP</div>
+        <div style="font-size:.78rem;color:#6B7280">Click the <strong>"Download Free"</strong> button above. A ZIP file will download to your computer.</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
+      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">2</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Extract the ZIP file</div>
+        <div style="font-size:.78rem;color:#6B7280">Right-click the downloaded ZIP → <strong>Extract All</strong> → choose a folder you'll remember (like Desktop).</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
+      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">3</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Open Chrome Extensions page</div>
+        <div style="font-size:.78rem;color:#6B7280">In Chrome, type <strong>chrome://extensions</strong> in the address bar and press Enter. Enable <strong>Developer mode</strong> using the toggle in the top right corner.</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
+      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">4</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Load the extension</div>
+        <div style="font-size:.78rem;color:#6B7280">Click <strong>Load unpacked</strong> → navigate to the extracted folder → select the <strong>extension</strong> folder inside it → click Select Folder.</div>
+      </div>
+    </div>
+    <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
+      <div style="background:#16A34A;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">5</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:#166534;margin-bottom:3px">Pin it & start using! 🎉</div>
+        <div style="font-size:.78rem;color:#166534">Click the 🧩 puzzle icon in Chrome toolbar → pin AllFormatsReady. Now open any portal (EPFO, Bank KYC, UIDAI) and click the extension icon to convert right there!</div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:16px;font-size:.78rem;color:#6B7280">
+    Having trouble? <a href="https://github.com/MOHITH-KVS/allformatsready" target="_blank" style="color:#2563EB;font-weight:600">Visit our GitHub</a> for help.
+  </div>
 </section>
 
 <footer>
@@ -1361,6 +1454,48 @@
     buildPresets();
   resultsSection.scrollIntoView({behavior:"smooth", block:"start"});
   }
+
+  // ── Extension download + share ──
+  function downloadExtension() {
+    const link = document.createElement("a");
+    link.href = "https://github.com/MOHITH-KVS/allformatsready/releases/download/v1.0.0/extension.zip";
+    link.download = "allformatsready-extension.zip";
+    link.click();
+    gtag('event', 'extension_download');
+    setTimeout(() => {
+      document.getElementById("extModal").style.display = "flex";
+    }, 1500);
+  }
+
+  function closeExtModal() {
+    document.getElementById("extModal").style.display = "none";
+  }
+
+  function shareWhatsApp() {
+    const msg = encodeURIComponent("🔥 Found this amazing free tool!\n\nAllFormatsReady — Upload any document ONCE and get every format instantly.\n✅ JPG under 100KB, 200KB, 500KB\n✅ PDF compressed\n✅ Works for EPFO, Bank KYC, UIDAI, Passport & more\n✅ Chrome Extension auto-detects your portal\n\nNo sign-up. No watermark. Files deleted in 60 seconds 🔒\n\n👉 Try it free: https://allformatsready.vercel.app");
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+    gtag('event', 'share', { platform: 'whatsapp' });
+  }
+
+  function shareInstagram() {
+    const caption = `🚀 Stop wasting time converting documents!\n\nAllFormatsReady — Upload ONCE, get every format instantly 🔥\n✅ JPG in every size\n✅ PDF compressed\n✅ Works for EPFO, Bank KYC, UIDAI & 20+ Indian portals\n✅ Chrome Extension that auto-detects your portal\n\nFree. No sign-up. Try it 👇\nallformatsready.vercel.app\n\n#AllFormatsReady #Indiatech #EPFO #Aadhaar #FreeTools #DocumentConverter`;
+    navigator.clipboard.writeText(caption).then(() => {
+      alert("📸 Caption copied to clipboard! Open Instagram and paste it in your story or post.");
+    });
+    gtag('event', 'share', { platform: 'instagram' });
+  }
+
+  function shareLinkedIn() {
+    const url = encodeURIComponent("https://allformatsready.vercel.app");
+    const title = encodeURIComponent("AllFormatsReady — Upload Once, Get Every Format Instantly");
+    const summary = encodeURIComponent("Stop wasting 45 minutes converting documents for EPFO, Bank KYC, UIDAI portals. Upload once → get JPG in every size, PDF compressed, PNG, WebP, DOCX instantly. Free Chrome Extension included. No sign-up. No watermark.");
+    window.open(`https://www.linkedin.com/shareArticle?mini=true&url=${url}&title=${title}&summary=${summary}`, "_blank");
+    gtag('event', 'share', { platform: 'linkedin' });
+  }
+
+  document.getElementById("extModal").addEventListener("click", function(e) {
+    if(e.target === this) closeExtModal();
+  });
 
 </script>
 
