@@ -14,12 +14,9 @@ from slowapi.errors import RateLimitExceeded
 fitz_mod = None
 Image_cls = None
 DocxDocument = None
-psd_open = None
-svg2rlg = None
-renderPM = None
 
 def load_libs():
-    global fitz_mod, Image_cls, DocxDocument, psd_open, svg2rlg, renderPM
+    global fitz_mod, Image_cls, DocxDocument
     if fitz_mod is None:
         import fitz as _fitz
         fitz_mod = _fitz
@@ -38,20 +35,6 @@ def load_libs():
             DocxDocument = _Doc
         except:
             DocxDocument = None
-    if psd_open is None:
-        try:
-            from psd_tools import PSDImage as _PSDImage
-            psd_open = _PSDImage.open
-        except:
-            psd_open = False
-    if svg2rlg is None:
-        try:
-            from svglib.svglib import svg2rlg as _svg2rlg
-            from reportlab.graphics import renderPM as _renderPM
-            svg2rlg = _svg2rlg
-            renderPM = _renderPM
-        except:
-            svg2rlg = False
 
 @asynccontextmanager
 async def lifespan(app):
@@ -197,65 +180,6 @@ def pil_to_docx(imgs) -> bytes:
         return b""
 
 
-def psd_to_pil(file_bytes):
-    """Convert PSD bytes to a flattened PIL RGB image."""
-    psd = psd_open(io.BytesIO(file_bytes))
-    img = psd.composite()  # flattens all visible layers
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    return img
-
-
-def svg_to_pil(file_bytes):
-    """Convert SVG bytes to a PIL RGB image via svglib + reportlab."""
-    import tempfile
-    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
-    try:
-        drawing = svg2rlg(tmp_path)
-        png_buf = io.BytesIO()
-        renderPM.drawToFile(drawing, png_buf, fmt="PNG")
-        png_buf.seek(0)
-        img = Image_cls.open(png_buf)
-        if img.mode in ("RGBA", "P"):
-            bg = Image_cls.new("RGB", img.size, (255, 255, 255))
-            bg.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[-1])
-            img = bg
-        else:
-            img = img.convert("RGB")
-        return img
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except:
-            pass
-
-
-def open_any_image(file_bytes, ext, content_type):
-    """Open an image of any supported format (incl. GIF/BMP/TIFF/PSD/SVG) as a flattened PIL RGB image."""
-    is_psd = ext == "psd" or "photoshop" in (content_type or "")
-    is_svg = ext == "svg" or "svg" in (content_type or "")
-
-    if is_psd:
-        if not psd_open:
-            raise HTTPException(status_code=400, detail="PSD support is currently unavailable.")
-        return psd_to_pil(file_bytes)
-
-    if is_svg:
-        if not svg2rlg:
-            raise HTTPException(status_code=400, detail="SVG support is currently unavailable.")
-        return svg_to_pil(file_bytes)
-
-    # GIF / BMP / TIFF / JPG / PNG / WEBP / HEIC all handled natively by Pillow
-    img = Image_cls.open(io.BytesIO(file_bytes))
-    if getattr(img, "is_animated", False):
-        img.seek(0)  # use first frame for animated GIFs
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    return img
-
-
 def make_file(name, fmt, data, label, category, page=None):
     return {
         "name": name, "format": fmt, "label": label,
@@ -295,31 +219,6 @@ def image_outputs(img, prefix="", page_num=None):
     d = compress_to_target(img, "WEBP", 200)
     outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg}","WebP",page_num))
 
-    # GIF
-    buf = io.BytesIO()
-    img.save(buf, format="GIF")
-    outputs.append(make_file(f"{p}image.gif","GIF",buf.getvalue(),f"GIF{pg}","GIF",page_num))
-
-    # BMP
-    buf = io.BytesIO()
-    img.save(buf, format="BMP")
-    outputs.append(make_file(f"{p}image.bmp","BMP",buf.getvalue(),f"BMP — Bitmap{pg}","BMP",page_num))
-
-    # TIFF
-    buf = io.BytesIO()
-    img.save(buf, format="TIFF")
-    outputs.append(make_file(f"{p}image.tiff","TIFF",buf.getvalue(),f"TIFF — Lossless{pg}","TIFF",page_num))
-
-    # ICO
-    try:
-        ico_img = img.copy()
-        ico_img.thumbnail((256, 256), Image_cls.LANCZOS)
-        buf = io.BytesIO()
-        ico_img.save(buf, format="ICO", sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])
-        outputs.append(make_file(f"{p}image.ico","ICO",buf.getvalue(),f"ICO — Favicon{pg}","ICO",page_num))
-    except:
-        pass
-
     return outputs
 
 
@@ -349,6 +248,7 @@ async def convert(request: Request, file: UploadFile = File(...)):
 
     is_pdf = ext == "pdf" or "pdf" in (file.content_type or "")
     is_docx = ext in ["docx","doc"] or "wordprocessing" in (file.content_type or "")
+    is_heic = ext in ["heic","heif"] or "heic" in (file.content_type or "") or "heif" in (file.content_type or "")
     is_image = not is_pdf and not is_docx
 
     if is_docx:
@@ -363,8 +263,7 @@ async def convert(request: Request, file: UploadFile = File(...)):
         text = "".join(pg.get_text() for pg in doc)
         sensitive = is_sensitive(filename, text)
 
-        outputs.append(make_file("original.pdf","PDF",file_bytes,"PDF — Original","PDF"))
-        outputs.append(make_file("compressed.pdf","PDF",compress_pdf(file_bytes),"PDF — Compressed","PDF"))
+        outputs.append(make_file("compressed.pdf","PDF",compress_pdf(file_bytes),"Compressed PDF","PDF"))
 
         if sensitive:
             try:
@@ -393,9 +292,7 @@ async def convert(request: Request, file: UploadFile = File(...)):
 
     elif is_image:
         try:
-            img = open_any_image(file_bytes, ext, file.content_type)
-        except HTTPException:
-            raise
+            img = Image_cls.open(io.BytesIO(file_bytes)).convert("RGB")
         except:
             raise HTTPException(status_code=400, detail="Could not read image file.")
 
@@ -429,18 +326,14 @@ async def convert_multiple(request: Request, files: list[UploadFile] = File(...)
         total_size += len(file_bytes)
         if total_size > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail="Total size too large. Max 10MB total.")
-        fname = f.filename or ""
-        f_ext = fname.lower().rsplit(".", 1)[-1] if "." in fname else ""
         try:
-            img = open_any_image(file_bytes, f_ext, f.content_type)
+            img = Image_cls.open(io.BytesIO(file_bytes)).convert("RGB")
             # Resize if needed
             max_w = 1200
             if img.width > max_w:
                 ratio = max_w / img.width
                 img = img.resize((max_w, int(img.height * ratio)), Image_cls.LANCZOS)
-            all_imgs.append((fname or f"image_{len(all_imgs)+1}", img))
-        except HTTPException:
-            raise
+            all_imgs.append((f.filename or f"image_{len(all_imgs)+1}", img))
         except:
             raise HTTPException(status_code=400, detail=f"Could not read image: {f.filename}")
 
@@ -474,26 +367,21 @@ async def convert_multiple(request: Request, files: list[UploadFile] = File(...)
         d = compress_to_target(img, "WEBP", 200)
         outputs.append(make_file(f"{p}webp_under_200kb.webp","WEBP",d,f"WebP — Under 200KB{pg_label}","WebP",pg))
 
-        # Individual PDF — normal + compressed
+        # Individual PDF
         raw_pdf = img_bytes(img, "PDF")
         outputs.append(make_file(f"{p}image_as_pdf.pdf","PDF",raw_pdf,f"PDF — Image {i}","PDF",pg))
-        outputs.append(make_file(f"{p}image_as_pdf_compressed.pdf","PDF",compress_pdf(raw_pdf),f"PDF — Image {i} Compressed","PDF",pg))
 
     # ── Combined PDF (all images in one PDF) ──
     if total_count > 1:
         imgs_only = [img for _, img in all_imgs]
+        # Use Pillow to save all images as multi-page PDF
         buf = io.BytesIO()
         imgs_only[0].save(buf, format="PDF", save_all=True, append_images=imgs_only[1:])
         combined_pdf = buf.getvalue()
         outputs.append(make_file(
             "combined_all_images.pdf","PDF",
-            combined_pdf,
-            f"PDF — All {total_count} Images Combined","PDF"
-        ))
-        outputs.append(make_file(
-            "combined_all_images_compressed.pdf","PDF",
             compress_pdf(combined_pdf),
-            f"PDF — All {total_count} Images Compressed","PDF"
+            f"PDF — All {total_count} Images Combined","PDF"
         ))
 
         # ── Combined DOCX (all images in one Word doc) ──
@@ -510,3 +398,95 @@ async def convert_multiple(request: Request, files: list[UploadFile] = File(...)
         "total_pages": total_count,
         "combined": total_count > 1
     })
+
+
+# ══════════════════════════════════════════════
+# NEW ENDPOINT: PDF Merge
+# ══════════════════════════════════════════════
+@app.post("/merge-pdf")
+@limiter.limit("5/minute")
+async def merge_pdf(request: Request, files: list[UploadFile] = File(...)):
+    """Merge multiple PDFs into one combined PDF."""
+    load_libs()
+
+    if len(files) < 2:
+        raise HTTPException(status_code=400, detail="Upload at least 2 PDF files to merge.")
+    if len(files) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 PDFs at once.")
+
+    merger = fitz_mod.open()
+    total_size = 0
+
+    for f in files:
+        ext = (f.filename or "").lower().rsplit(".", 1)[-1]
+        if ext != "pdf":
+            raise HTTPException(status_code=400, detail=f"{f.filename} is not a PDF. Only PDF files can be merged.")
+        file_bytes = await f.read()
+        total_size += len(file_bytes)
+        if total_size > 30 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Total size too large. Max 30MB total for merge.")
+        try:
+            doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
+            merger.insert_pdf(doc)
+            doc.close()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not read {f.filename}: {e}")
+
+    # Save merged PDF
+    buf = io.BytesIO()
+    merger.save(buf, garbage=4, deflate=True, deflate_images=True)
+    merger.close()
+    merged_bytes = buf.getvalue()
+
+    return JSONResponse(content={
+        "merged_pdf": base64.b64encode(merged_bytes).decode(),
+        "size_kb": round(len(merged_bytes) / 1024, 1),
+        "pages": sum(1 for _ in fitz_mod.open(stream=merged_bytes, filetype="pdf")),
+        "files_merged": len(files)
+    })
+
+
+# ══════════════════════════════════════════════
+# NEW ENDPOINT: PDF to Text (extract text)
+# ══════════════════════════════════════════════
+@app.post("/pdf-to-text")
+@limiter.limit("10/minute")
+async def pdf_to_text(request: Request, file: UploadFile = File(...)):
+    """Extract all text from a PDF file."""
+    load_libs()
+
+    ext = (file.filename or "").lower().rsplit(".", 1)[-1]
+    if ext != "pdf":
+        raise HTTPException(status_code=400, detail="Only PDF files supported for text extraction.")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 10MB.")
+
+    try:
+        doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
+        pages_text = []
+        full_text = ""
+        for i, page in enumerate(doc, 1):
+            text = page.get_text().strip()
+            pages_text.append({"page": i, "text": text, "chars": len(text)})
+            full_text += f"\n--- Page {i} ---\n{text}\n"
+        doc.close()
+
+        total_chars = sum(p["chars"] for p in pages_text)
+        total_pages = len(pages_text)
+
+        # Also return as downloadable .txt base64
+        txt_bytes = full_text.encode("utf-8")
+        txt_b64 = base64.b64encode(txt_bytes).decode()
+
+        return JSONResponse(content={
+            "pages": pages_text,
+            "total_pages": total_pages,
+            "total_chars": total_chars,
+            "full_text": full_text,
+            "txt_b64": txt_b64,
+            "has_text": total_chars > 50
+        })
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not extract text: {e}")

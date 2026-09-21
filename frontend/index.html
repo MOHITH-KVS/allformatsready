@@ -4,14 +4,6 @@
   <meta charset="UTF-8"/>
   <meta name="google-site-verification" content="RTnFvMSc2n4XJRE71nlR9CG3ldH2CY5v56yuynn7qf8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YS1K930FKD"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-YS1K930FKD');
-  </script>
   <title>AllFormatsReady – Upload Once, Get All Formats | Aadhaar, PAN, PDF Converter India</title>
   <meta name="description" content="Upload any document or image once — get PDF compressed, JPG, PNG, WebP in all sizes instantly. Free Indian document converter for Aadhaar, PAN, Passport, bank KYC, EPFO, UIDAI, Income Tax. No sign-up needed."/>
   <meta name="keywords" content="compress aadhaar pdf, aadhaar card jpg under 200kb, pan card pdf to jpg, compress document for bank kyc, pdf to jpg india, aadhaar pdf compress online, epfo document upload, uidai document format, convert pdf to jpg online free, document format converter india, pdf converter free india, image to pdf converter, compress pdf online free, jpg to pdf converter, png to jpg converter, document converter for government forms, passport photo converter, income tax document upload, compress image under 200kb"/>
@@ -21,7 +13,500 @@
   <meta property="og:title" content="AllFormatsReady – Upload Once, Get Every Format"/>
   <meta property="og:description" content="Free Indian document converter. Upload Aadhaar, PAN or any file – get JPG, PNG, WebP, compressed PDF in all sizes instantly."/>
   <meta property="og:type" content="website"/>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AllFormatsReady","description":"Upload your document once and get all formats instantly.","url":"https://allformatsready.vercel.app","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AllFormatsReady","description":"Upload your document once and get all formats instantly.","url":"https://allformatsready.vercel.app","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}}
+  // ══════════════════════════════════════════
+  // WEBSITE PASSPORT PHOTO TOOL
+  // ══════════════════════════════════════════
+  (function(){
+    const MM_TO_PX = 300 / 25.4;
+    let ppImg = null;
+    let ppPreset = {w:35, h:45, name:"Indian Passport"};
+    let ppBg = "#ffffff";
+    let ppZoom = 1.0;
+    let ppCropX = 0, ppCropY = 0, ppCropW = 0, ppCropH = 0;
+    let ppDragging = false;
+    let ppDragSX = 0, ppDragSY = 0, ppCropSX = 0, ppCropSY = 0;
+    let ppCanvas = null, ppCtx = null, ppScale = 1;
+    let ppOutCanvas = null;
+
+    function init(){
+      ppCanvas = document.getElementById("ppWebCanvas");
+      if(!ppCanvas) return;
+      ppCtx = ppCanvas.getContext("2d");
+
+      // Presets
+      document.querySelectorAll(".pp-web-preset").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".pp-web-preset").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          ppPreset = {w:parseFloat(btn.dataset.w), h:parseFloat(btn.dataset.h), name:btn.dataset.name};
+          if(ppImg){ initCrop(); draw(); resetResult(); }
+        });
+      });
+
+      // Custom size
+      document.getElementById("ppWebApply")?.addEventListener("click", () => {
+        const w = parseFloat(document.getElementById("ppWebW").value);
+        const h = parseFloat(document.getElementById("ppWebH").value);
+        const unit = document.getElementById("ppWebUnit").value;
+        if(!w||!h||w<=0||h<=0){ alert("Enter valid size."); return; }
+        let wm=w, hm=h;
+        if(unit==="px"){ wm=w*25.4/96; hm=h*25.4/96; }
+        else if(unit==="in"){ wm=w*25.4; hm=h*25.4; }
+        ppPreset={w:wm, h:hm, name:`Custom ${w}×${h}${unit}`};
+        document.querySelectorAll(".pp-web-preset").forEach(b=>b.classList.remove("active"));
+        if(ppImg){ initCrop(); draw(); resetResult(); }
+      });
+
+      // Background
+      document.querySelectorAll(".pp-web-bg-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".pp-web-bg-btn").forEach(b=>b.classList.remove("active"));
+          btn.classList.add("active");
+          ppBg = btn.dataset.color;
+          if(ppImg){ draw(); resetResult(); }
+        });
+      });
+      document.getElementById("ppWebColorPicker")?.addEventListener("input", e => {
+        document.querySelectorAll(".pp-web-bg-btn").forEach(b=>b.classList.remove("active"));
+        ppBg = e.target.value;
+        if(ppImg){ draw(); resetResult(); }
+      });
+
+      // File upload
+      document.getElementById("ppWebFileInput")?.addEventListener("change", e => {
+        if(e.target.files[0]) loadImg(e.target.files[0]);
+      });
+
+      // Zoom
+      document.getElementById("ppWebZoom")?.addEventListener("input", e => {
+        ppZoom = parseInt(e.target.value)/100;
+        document.getElementById("ppWebZoomVal").textContent = e.target.value+"%";
+        if(ppImg){ updateCropSize(); draw(); resetResult(); }
+      });
+
+      // Reset crop
+      document.getElementById("ppWebReset")?.addEventListener("click", () => {
+        ppZoom=1.0;
+        const zs=document.getElementById("ppWebZoom");
+        const zv=document.getElementById("ppWebZoomVal");
+        if(zs) zs.value=100;
+        if(zv) zv.textContent="100%";
+        if(ppImg){ initCrop(); draw(); resetResult(); }
+      });
+
+      // Generate
+      document.getElementById("btnPpWebGen")?.addEventListener("click", generate);
+
+      // Download
+      document.getElementById("ppWebDlJpg")?.addEventListener("click", () => dlPP("jpg"));
+      document.getElementById("ppWebDlPng")?.addEventListener("click", () => dlPP("png"));
+
+      // Canvas drag
+      ppCanvas.addEventListener("mousedown", ds);
+      ppCanvas.addEventListener("mousemove", dm);
+      ppCanvas.addEventListener("mouseup", de);
+      ppCanvas.addEventListener("mouseleave", de);
+      ppCanvas.addEventListener("touchstart", e=>ds(e.touches[0]));
+      ppCanvas.addEventListener("touchmove", e=>{e.preventDefault();dm(e.touches[0]);},{passive:false});
+      ppCanvas.addEventListener("touchend", de);
+    }
+
+    function loadImg(file){
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          ppImg = img;
+          ppZoom = 1.0;
+          const zs=document.getElementById("ppWebZoom");
+          const zv=document.getElementById("ppWebZoomVal");
+          if(zs) zs.value=100;
+          if(zv) zv.textContent="100%";
+          document.getElementById("ppWebUpload").style.display="none";
+          document.getElementById("ppWebCanvasWrap").classList.add("show");
+          document.getElementById("ppWebZoomRow").style.display="flex";
+          document.getElementById("ppWebPlaceholder").style.display="none";
+          document.getElementById("btnPpWebGen").disabled=false;
+          resetResult();
+          initCrop(); draw();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function initCrop(){
+      if(!ppImg) return;
+      const ratio = ppPreset.w / ppPreset.h;
+      ppCropW = ppImg.width * 0.7 / ppZoom;
+      ppCropH = ppCropW / ratio;
+      if(ppCropH > ppImg.height*0.9){ ppCropH=ppImg.height*0.9; ppCropW=ppCropH*ratio; }
+      ppCropX = (ppImg.width - ppCropW)/2;
+      ppCropY = ppImg.height*0.03;
+    }
+
+    function updateCropSize(){
+      if(!ppImg) return;
+      const ratio = ppPreset.w / ppPreset.h;
+      const centerX = ppCropX + ppCropW/2;
+      const centerY = ppCropY + ppCropH/2;
+      ppCropW = ppImg.width * 0.7 / ppZoom;
+      ppCropH = ppCropW / ratio;
+      ppCropX = Math.max(0, Math.min(ppImg.width-ppCropW, centerX-ppCropW/2));
+      ppCropY = Math.max(0, Math.min(ppImg.height-ppCropH, centerY-ppCropH/2));
+    }
+
+    function draw(){
+      if(!ppImg||!ppCanvas) return;
+      const maxW=360, maxH=240;
+      const ir=ppImg.width/ppImg.height;
+      let dW=maxW, dH=maxW/ir;
+      if(dH>maxH){dH=maxH;dW=maxH*ir;}
+      ppCanvas.width=dW; ppCanvas.height=dH;
+      ppScale=dW/ppImg.width;
+      ppCtx.drawImage(ppImg,0,0,dW,dH);
+      ppCtx.fillStyle="rgba(0,0,0,0.55)";
+      ppCtx.fillRect(0,0,dW,dH);
+      const cx=ppCropX*ppScale, cy=ppCropY*ppScale;
+      const cw=ppCropW*ppScale, ch=ppCropH*ppScale;
+      ppCtx.save();
+      ppCtx.beginPath();
+      ppCtx.rect(cx,cy,cw,ch);
+      ppCtx.clip();
+      ppCtx.fillStyle=ppBg;
+      ppCtx.fillRect(cx,cy,cw,ch);
+      ppCtx.drawImage(ppImg,0,0,dW,dH);
+
+      // Face oval guide
+      ppCtx.strokeStyle="rgba(255,255,0,0.5)";
+      ppCtx.lineWidth=1.5;
+      ppCtx.setLineDash([4,3]);
+      ppCtx.beginPath();
+      ppCtx.ellipse(cx+cw/2, cy+ch*0.38, cw*0.28, ch*0.32, 0, 0, Math.PI*2);
+      ppCtx.stroke();
+      ppCtx.setLineDash([]);
+
+      ppCtx.restore();
+      ppCtx.strokeStyle="#fff";
+      ppCtx.lineWidth=2;
+      ppCtx.strokeRect(cx,cy,cw,ch);
+      const hs=8;
+      ppCtx.fillStyle="#fff";
+      [[cx,cy],[cx+cw-hs,cy],[cx,cy+ch-hs],[cx+cw-hs,cy+ch-hs]].forEach(([hx,hy])=>ppCtx.fillRect(hx,hy,hs,hs));
+      ppCtx.strokeStyle="rgba(255,255,255,0.2)";
+      ppCtx.lineWidth=0.5;
+      ppCtx.beginPath();
+      ppCtx.moveTo(cx+cw/3,cy);ppCtx.lineTo(cx+cw/3,cy+ch);
+      ppCtx.moveTo(cx+cw*2/3,cy);ppCtx.lineTo(cx+cw*2/3,cy+ch);
+      ppCtx.moveTo(cx,cy+ch/3);ppCtx.lineTo(cx+cw,cy+ch/3);
+      ppCtx.moveTo(cx,cy+ch*2/3);ppCtx.lineTo(cx+cw,cy+ch*2/3);
+      ppCtx.stroke();
+      ppCtx.fillStyle="rgba(0,0,0,0.5)";
+      ppCtx.fillRect(cx,cy+ch-16,cw,16);
+      ppCtx.fillStyle="#fff";
+      ppCtx.font="9px Arial";
+      ppCtx.textAlign="center";
+      ppCtx.fillText(`${ppPreset.w}×${ppPreset.h}mm · ${ppPreset.name}`,cx+cw/2,cy+ch-4);
+      ppCtx.textAlign="left";
+    }
+
+    function ds(e){
+      ppDragging=true;
+      const r=ppCanvas.getBoundingClientRect();
+      ppDragSX=(e.clientX||e.pageX)-r.left;
+      ppDragSY=(e.clientY||e.pageY)-r.top;
+      ppCropSX=ppCropX; ppCropSY=ppCropY;
+    }
+    function dm(e){
+      if(!ppDragging) return;
+      const r=ppCanvas.getBoundingClientRect();
+      const mx=(e.clientX||e.pageX)-r.left;
+      const my=(e.clientY||e.pageY)-r.top;
+      ppCropX=Math.max(0,Math.min(ppImg.width-ppCropW,ppCropSX+(mx-ppDragSX)/ppScale));
+      ppCropY=Math.max(0,Math.min(ppImg.height-ppCropH,ppCropSY+(my-ppDragSY)/ppScale));
+      draw();
+    }
+    function de(){ ppDragging=false; }
+
+    function generate(){
+      if(!ppImg) return;
+      const outW=Math.round(ppPreset.w*MM_TO_PX);
+      const outH=Math.round(ppPreset.h*MM_TO_PX);
+      ppOutCanvas=document.createElement("canvas");
+      ppOutCanvas.width=outW; ppOutCanvas.height=outH;
+      const ctx=ppOutCanvas.getContext("2d");
+      ctx.fillStyle=ppBg;
+      ctx.fillRect(0,0,outW,outH);
+      ctx.drawImage(ppImg,ppCropX,ppCropY,ppCropW,ppCropH,0,0,outW,outH);
+      const prev=document.getElementById("ppWebResultImg");
+      const meta=document.getElementById("ppWebResultMeta");
+      const result=document.getElementById("ppWebResult");
+      prev.src=ppOutCanvas.toDataURL("image/jpeg",0.92);
+      meta.textContent=`${ppPreset.name} · ${ppPreset.w}×${ppPreset.h}mm · ${outW}×${outH}px · 300 DPI`;
+      result.classList.add("show");
+    }
+
+    function dlPP(fmt){
+      if(!ppOutCanvas) return;
+      const mime=fmt==="png"?"image/png":"image/jpeg";
+      const a=document.createElement("a");
+      a.href=ppOutCanvas.toDataURL(mime,fmt==="png"?1:0.95);
+      a.download=`passport_${ppPreset.w}x${ppPreset.h}mm.${fmt}`;
+      a.click();
+    }
+
+    function resetResult(){
+      document.getElementById("ppWebResult")?.classList.remove("show");
+      ppOutCanvas=null;
+    }
+
+    if(document.readyState==="loading"){
+      document.addEventListener("DOMContentLoaded",init);
+    } else {
+      init();
+    }
+  })();
+
+  // ══════════════════════════════════════════
+  // PDF MERGE TOOL
+  // ══════════════════════════════════════════
+  (function(){
+    let mergeFiles = [];
+    let mergedB64 = null;
+
+    const mergeInput = document.getElementById("mergeFileInput");
+    const mergeChips = document.getElementById("mergeChips");
+    const btnMerge   = document.getElementById("btnMerge");
+    const mergeProgress = document.getElementById("mergeProgress");
+    const mergeFill  = document.getElementById("mergeFill");
+    const mergeLabel = document.getElementById("mergeLabel");
+    const mergeResult= document.getElementById("mergeResult");
+    const mergeMeta  = document.getElementById("mergeMeta");
+    const btnMergeDl = document.getElementById("btnMergeDl");
+    const mergeDropZone = document.getElementById("mergeDropZone");
+
+    function addFiles(files){
+      Array.from(files).forEach(f => {
+        if(!f.name.toLowerCase().endsWith(".pdf")) return;
+        if(mergeFiles.length >= 10) return;
+        mergeFiles.push(f);
+      });
+      renderChips();
+      btnMerge.disabled = mergeFiles.length < 2;
+    }
+
+    function renderChips(){
+      mergeChips.innerHTML = "";
+      mergeFiles.forEach((f, i) => {
+        const chip = document.createElement("div");
+        chip.className = "tool-chip";
+        chip.innerHTML = `📄 ${f.name} <button class="tool-chip-remove" data-i="${i}">✕</button>`;
+        mergeChips.appendChild(chip);
+      });
+      mergeChips.querySelectorAll(".tool-chip-remove").forEach(btn => {
+        btn.addEventListener("click", () => {
+          mergeFiles.splice(parseInt(btn.dataset.i), 1);
+          renderChips();
+          btnMerge.disabled = mergeFiles.length < 2;
+        });
+      });
+    }
+
+    mergeInput.addEventListener("change", () => addFiles(mergeInput.files));
+    mergeDropZone.addEventListener("dragover", e => { e.preventDefault(); mergeDropZone.style.borderColor = "var(--brand)"; });
+    mergeDropZone.addEventListener("dragleave", () => mergeDropZone.style.borderColor = "");
+    mergeDropZone.addEventListener("drop", e => {
+      e.preventDefault(); mergeDropZone.style.borderColor = "";
+      addFiles(e.dataTransfer.files);
+    });
+
+    btnMerge.addEventListener("click", async () => {
+      if(mergeFiles.length < 2) return;
+      btnMerge.disabled = true;
+      mergeResult.classList.remove("show");
+      mergeProgress.classList.add("show");
+      mergeFill.style.width = "30%";
+      mergeLabel.textContent = `Merging ${mergeFiles.length} PDFs…`;
+
+      try {
+        const fd = new FormData();
+        mergeFiles.forEach(f => fd.append("files", f));
+        mergeFill.style.width = "60%";
+        const res = await fetch(`${API_URL}/merge-pdf`, { method:"POST", body:fd });
+        mergeFill.style.width = "90%";
+        if(!res.ok){ const e=await res.json(); throw new Error(e.detail||"Merge failed"); }
+        const data = await res.json();
+        mergedB64 = data.merged_pdf;
+        mergeFill.style.width = "100%";
+        mergeLabel.textContent = "Done!";
+        mergeMeta.textContent = `${data.files_merged} PDFs merged · ${data.pages} pages · ${data.size_kb} KB`;
+        setTimeout(() => {
+          mergeProgress.classList.remove("show");
+          mergeResult.classList.add("show");
+          btnMerge.disabled = false;
+        }, 400);
+      } catch(err) {
+        mergeProgress.classList.remove("show");
+        btnMerge.disabled = false;
+        alert("⚠️ " + (err.message || "Merge failed. Try again."));
+      }
+    });
+
+    btnMergeDl.addEventListener("click", () => {
+      if(!mergedB64) return;
+      const bc = atob(mergedB64);
+      const ba = new Uint8Array(bc.length);
+      for(let i=0;i<bc.length;i++) ba[i]=bc.charCodeAt(i);
+      const blob = new Blob([ba], {type:"application/pdf"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href=url; a.download="merged_allformatsready.pdf"; a.click();
+      URL.revokeObjectURL(url);
+    });
+  })();
+
+  // ══════════════════════════════════════════
+  // PDF TO TEXT TOOL
+  // ══════════════════════════════════════════
+  (function(){
+    let txtB64 = null;
+
+    const textInput   = document.getElementById("textFileInput");
+    const btnExtract  = document.getElementById("btnExtractText");
+    const textProgress= document.getElementById("textProgress");
+    const textFill    = document.getElementById("textFill");
+    const textLabel   = document.getElementById("textLabel");
+    const textResult  = document.getElementById("textResult");
+    const textResultTitle = document.getElementById("textResultTitle");
+    const textArea    = document.getElementById("textArea");
+    const btnCopyText = document.getElementById("btnCopyText");
+    const btnDlText   = document.getElementById("btnDlText");
+    const textDropZone = document.getElementById("textDropZone");
+
+    function setTextFile(file){
+      if(!file.name.toLowerCase().endsWith(".pdf")){ alert("Please upload a PDF file."); return; }
+      btnExtract.disabled = false;
+      btnExtract.textContent = `Extract Text from "${file.name}" →`;
+      btnExtract._file = file;
+      textResult.classList.remove("show");
+    }
+
+    textInput.addEventListener("change", () => { if(textInput.files[0]) setTextFile(textInput.files[0]); });
+    textDropZone.addEventListener("dragover", e => { e.preventDefault(); textDropZone.style.borderColor="var(--brand)"; });
+    textDropZone.addEventListener("dragleave", () => textDropZone.style.borderColor="");
+    textDropZone.addEventListener("drop", e => {
+      e.preventDefault(); textDropZone.style.borderColor="";
+      if(e.dataTransfer.files[0]) setTextFile(e.dataTransfer.files[0]);
+    });
+
+    btnExtract.addEventListener("click", async () => {
+      const file = btnExtract._file;
+      if(!file) return;
+      btnExtract.disabled = true;
+      textResult.classList.remove("show");
+      textProgress.classList.add("show");
+      textFill.style.width = "30%";
+      textLabel.textContent = "Extracting text…";
+
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        textFill.style.width = "70%";
+        const res = await fetch(`${API_URL}/pdf-to-text`, {method:"POST", body:fd});
+        textFill.style.width = "95%";
+        if(!res.ok){ const e=await res.json(); throw new Error(e.detail||"Extraction failed"); }
+        const data = await res.json();
+        txtB64 = data.txt_b64;
+        textFill.style.width = "100%";
+        textLabel.textContent = "Done!";
+        setTimeout(() => {
+          textProgress.classList.remove("show");
+          if(!data.has_text){
+            textResultTitle.textContent = "⚠️ No text found — this may be a scanned image PDF";
+            textResultTitle.style.cssText = "color:#92400E;background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:8px 10px;font-size:.78rem;font-weight:700;margin-bottom:8px;display:block";
+            textArea.value = "No extractable text found. This PDF likely contains scanned images. Try converting it to JPG first using the main converter above.";
+          } else {
+            textResultTitle.textContent = `✅ ${data.total_pages} pages · ${data.total_chars.toLocaleString()} characters extracted`;
+            textResultTitle.style.cssText = "color:var(--success);font-size:.78rem;font-weight:700;margin-bottom:8px;display:block";
+            textArea.value = data.full_text;
+          }
+          textResult.classList.add("show");
+          btnExtract.disabled = false;
+          btnExtract.textContent = "Extract Text →";
+        }, 400);
+      } catch(err) {
+        textProgress.classList.remove("show");
+        btnExtract.disabled = false;
+        alert("⚠️ " + (err.message || "Extraction failed. Try again."));
+      }
+    });
+
+    btnCopyText.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(textArea.value);
+        btnCopyText.textContent = "✅ Copied!";
+        setTimeout(() => btnCopyText.textContent = "📋 Copy All", 1500);
+      } catch(e) {
+        textArea.select();
+        document.execCommand("copy");
+      }
+    });
+
+    btnDlText.addEventListener("click", () => {
+      if(!txtB64) return;
+      const bc=atob(txtB64); const ba=new Uint8Array(bc.length);
+      for(let i=0;i<bc.length;i++) ba[i]=bc.charCodeAt(i);
+      const blob=new Blob([ba],{type:"text/plain"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url; a.download="extracted_text.txt"; a.click();
+      URL.revokeObjectURL(url);
+    });
+  })();
+
+  // ══════════════════════════════════════════
+  // AUTO-RETRY on main convert
+  // ══════════════════════════════════════════
+  (function(){
+    let retryTimer = null;
+    const retryBanner = document.getElementById("retryBanner");
+    const retryText   = document.getElementById("retryBannerText");
+    const btnRetryNow = document.getElementById("btnRetryNow");
+
+    function startRetryCountdown(onRetry){
+      let secs = 30;
+      retryBanner.classList.add("show");
+      retryText.textContent = `Server waking up — auto-retrying in ${secs}s`;
+      retryTimer = setInterval(() => {
+        secs--;
+        retryText.textContent = `Server waking up — auto-retrying in ${secs}s`;
+        if(secs <= 0){
+          stopRetry();
+          onRetry();
+        }
+      }, 1000);
+      btnRetryNow.onclick = () => { stopRetry(); onRetry(); };
+    }
+
+    function stopRetry(){
+      if(retryTimer){ clearInterval(retryTimer); retryTimer=null; }
+      retryBanner.classList.remove("show");
+    }
+
+    // Patch the existing btnConvert click to add auto-retry
+    const origConvert = btnConvert.onclick;
+    const convertBtn = document.getElementById("btnConvert");
+    if(convertBtn){
+      const origHandler = convertBtn.onclick;
+      convertBtn.addEventListener("click", () => stopRetry());
+    }
+
+    // Expose for main convert error handler
+    window.startRetryCountdown = startRetryCountdown;
+    window.stopRetry = stopRetry;
+  })();
+</script>
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -139,8 +624,6 @@
     .results-title-wrap{}
     .results-title{font-size:1.1rem;font-weight:800;color:var(--gray-900)}
     .results-sub{font-size:.82rem;color:var(--gray-500);margin-top:2px}
-    .size-summary{display:flex;align-items:center;gap:8px;background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:#166534;font-weight:600}
-    .size-summary-icon{font-size:1rem;flex-shrink:0}
     .btn-zip{background:var(--gray-900);color:#fff;border:none;border-radius:9px;padding:10px 20px;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .15s,transform .1s}
     .btn-zip:hover{background:#000;transform:translateY(-1px)}
     .btn-new{background:#fff;color:var(--brand);border:1.5px solid var(--brand);border-radius:9px;padding:9px 18px;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .15s}
@@ -165,10 +648,6 @@
     .fmt-webp{background:#EDE9FE;color:#4C1D95}
     .fmt-pdf{background:#FEE2E2;color:#991B1B}
     .fmt-docx{background:#DBEAFE;color:#1E40AF}
-    .fmt-gif{background:#FFF7ED;color:#C2410C}
-    .fmt-bmp{background:#F0FDF4;color:#166534}
-    .fmt-tiff{background:#F0F9FF;color:#075985}
-    .fmt-ico{background:#FDF4FF;color:#7E22CE}
     .card-label{font-size:.83rem;font-weight:700;color:var(--gray-800);line-height:1.3;flex:1}
     .card-page-tag{font-size:.68rem;color:var(--gray-500);background:var(--gray-100);padding:1px 7px;border-radius:10px;align-self:flex-start}
     .masked-tag{font-size:.68rem;background:#FED7AA;color:#92400E;padding:2px 8px;border-radius:10px;font-weight:700;align-self:flex-start;display:flex;align-items:center;gap:3px}
@@ -258,14 +737,14 @@
     .preset-section{max-width:580px;margin:0 auto 0;padding:0 20px}
     .preset-label{font-size:.78rem;font-weight:700;color:var(--gray-600);margin-bottom:8px;display:flex;align-items:center;gap:6px}
     .preset-label span{background:var(--brand-light);color:var(--brand);font-size:.68rem;padding:1px 7px;border-radius:10px;font-weight:700}
-    .preset-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-    .preset-btn{background:#fff;border:1.5px solid var(--gray-200);border-radius:20px;padding:5px 11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
-    .preset-btn:hover{border-color:var(--brand);background:var(--brand-light)}
+    .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+    .preset-btn{background:#fff;border:1.5px solid var(--gray-200);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;transition:all .15s;display:flex;flex-direction:column;gap:3px}
+    .preset-btn:hover{border-color:var(--brand);background:var(--brand-light);transform:translateY(-1px);box-shadow:0 2px 8px rgba(37,99,235,.1)}
     .preset-btn.active{border-color:var(--brand);background:var(--brand-light)}
     .preset-btn.active .preset-name{color:var(--brand)}
-    .preset-icon{font-size:.85rem}
-    .preset-name{font-size:.74rem;font-weight:700;color:var(--gray-800)}
-    .preset-req{display:none}
+    .preset-icon{font-size:1.1rem}
+    .preset-name{font-size:.78rem;font-weight:700;color:var(--gray-800)}
+    .preset-req{font-size:.68rem;color:var(--gray-500);line-height:1.3}
     /* Preset highlight on cards */
     .file-card.preset-match{border-color:var(--brand);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
     .file-card.preset-match .btn-dl{background:var(--brand);color:#fff;border-color:var(--brand)}
@@ -324,6 +803,149 @@
       background:var(--brand-light);color:var(--brand);
       font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:10px;
     }
+
+    /* Passport photo section on website */
+    .pp-section{max-width:780px;margin:0 auto 48px;padding:0 20px}
+    .pp-section-header{text-align:center;margin-bottom:24px}
+    .pp-section-title{font-size:1.3rem;font-weight:800;color:var(--gray-900);margin-bottom:6px}
+    .pp-section-sub{font-size:.88rem;color:var(--gray-500)}
+    .pp-tool{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--gray-200);overflow:hidden}
+    .pp-tool-inner{display:grid;grid-template-columns:1fr 1fr;gap:0}
+    .pp-left{padding:20px;border-right:1px solid var(--gray-100)}
+    .pp-right{padding:20px}
+
+    /* Preset grid website */
+    .pp-web-presets{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px}
+    .pp-web-preset{background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:8px;padding:8px 10px;cursor:pointer;transition:all .15s;text-align:center}
+    .pp-web-preset:hover{border-color:var(--brand);background:var(--brand-light)}
+    .pp-web-preset.active{border-color:var(--brand);background:var(--brand-light)}
+    .pp-web-preset-name{font-size:.76rem;font-weight:700;color:var(--gray-800)}
+    .pp-web-preset-size{font-size:.65rem;color:var(--gray-500);margin-top:2px}
+
+    /* Background row */
+    .pp-web-bg-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+    .pp-web-bg-label{font-size:.76rem;font-weight:600;color:var(--gray-600);flex-shrink:0}
+    .pp-web-bg-btns{display:flex;gap:6px;align-items:center}
+    .pp-web-bg-btn{width:24px;height:24px;border-radius:50%;border:2px solid var(--gray-200);cursor:pointer;transition:border-color .15s;flex-shrink:0}
+    .pp-web-bg-btn.active{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-light)}
+    .pp-web-bg-white{background:#fff}
+    .pp-web-bg-blue{background:#1E3A5F}
+    .pp-web-bg-gray{background:#D1D5DB}
+    .pp-web-color-wrap{position:relative;width:24px;height:24px;border-radius:50%;border:2px solid var(--gray-200);overflow:hidden;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);cursor:pointer}
+    .pp-web-color-wrap input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+
+    /* Custom size */
+    .pp-web-custom{display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+    .pp-web-custom input{width:64px;padding:5px 7px;border:1px solid var(--gray-200);border-radius:6px;font-size:.78rem;text-align:center}
+    .pp-web-custom select{padding:5px 7px;border:1px solid var(--gray-200);border-radius:6px;font-size:.76rem;background:#fff}
+    .pp-web-custom .pp-sep{color:var(--gray-400);font-size:.9rem}
+    .btn-pp-apply{background:var(--brand-light);color:var(--brand);border:1px solid #BFDBFE;border-radius:6px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer}
+    .btn-pp-apply:hover{background:#DBEAFE}
+
+    /* Canvas wrap */
+    .pp-web-upload{border:2px dashed var(--gray-200);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:var(--gray-50);transition:all .2s;position:relative;margin-bottom:10px}
+    .pp-web-upload:hover{border-color:var(--brand);background:var(--brand-light)}
+    .pp-web-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .pp-web-upload-icon{font-size:1.8rem;display:block;margin-bottom:6px}
+    .pp-web-upload-text{font-size:.8rem;font-weight:600;color:var(--gray-600)}
+    .pp-web-upload-sub{font-size:.7rem;color:var(--gray-400);margin-top:2px}
+
+    .pp-web-canvas-wrap{display:none;position:relative;background:#000;border-radius:8px;overflow:hidden;margin-bottom:8px}
+    .pp-web-canvas-wrap.show{display:block}
+    .pp-web-zoom-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .pp-web-zoom-label{font-size:.74rem;font-weight:600;color:var(--gray-600);flex-shrink:0}
+    .pp-web-zoom-slider{flex:1;accent-color:var(--brand)}
+    .pp-web-zoom-val{font-size:.72rem;color:var(--gray-500);width:36px;flex-shrink:0}
+    .pp-web-reset{background:none;border:1px solid var(--gray-200);border-radius:5px;padding:3px 10px;font-size:.72rem;cursor:pointer;color:var(--gray-600);flex-shrink:0}
+    .pp-web-reset:hover{border-color:var(--brand);color:var(--brand)}
+    .btn-pp-web-gen{display:block;width:100%;padding:11px;background:var(--success);color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;margin-bottom:8px;transition:background .2s}
+    .btn-pp-web-gen:hover:not(:disabled){background:#15803D}
+    .btn-pp-web-gen:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed}
+
+    /* Result */
+    .pp-web-result{display:none}
+    .pp-web-result.show{display:block}
+    .pp-web-result-preview{border-radius:6px;border:1px solid var(--gray-200);max-width:100%;margin-bottom:10px;display:block}
+    .pp-web-result-meta{font-size:.76rem;color:var(--gray-600);margin-bottom:10px}
+    .pp-web-dl-btns{display:flex;gap:8px}
+    .pp-web-dl-btn{flex:1;padding:9px;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;text-align:center;transition:background .15s}
+    .pp-web-dl-jpg{background:var(--brand);color:#fff}
+    .pp-web-dl-jpg:hover{background:var(--brand-dark)}
+    .pp-web-dl-png{background:#fff;color:var(--brand);border:1.5px solid var(--brand)}
+    .pp-web-dl-png:hover{background:var(--brand-light)}
+
+    @media(max-width:600px){
+      .pp-tool-inner{grid-template-columns:1fr}
+      .pp-left{border-right:none;border-bottom:1px solid var(--gray-100)}
+      .pp-web-presets{grid-template-columns:1fr 1fr}
+    }
+
+    /* Tools section */
+    .tools-section{max-width:780px;margin:0 auto 48px;padding:0 20px}
+    .tools-header{text-align:center;margin-bottom:24px}
+    .tools-title{font-size:1.3rem;font-weight:800;color:var(--gray-900);margin-bottom:6px}
+    .tools-sub{font-size:.88rem;color:var(--gray-500)}
+    .tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .tool-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--gray-200);padding:20px;display:flex;flex-direction:column;gap:12px}
+    .tool-card-title{font-size:.95rem;font-weight:800;color:var(--gray-900);display:flex;align-items:center;gap:8px}
+    .tool-card-desc{font-size:.78rem;color:var(--gray-500);line-height:1.5;margin-top:-6px}
+
+    /* Multi upload drop */
+    .tool-drop{border:2px dashed var(--gray-200);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:var(--gray-50);transition:all .2s;position:relative}
+    .tool-drop:hover{border-color:var(--brand);background:var(--brand-light)}
+    .tool-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .tool-drop-icon{font-size:1.4rem;display:block;margin-bottom:4px}
+    .tool-drop-text{font-size:.76rem;font-weight:600;color:var(--gray-600)}
+    .tool-drop-sub{font-size:.66rem;color:var(--gray-400);margin-top:2px}
+
+    /* File chips */
+    .tool-chips{display:flex;flex-wrap:wrap;gap:5px;min-height:0}
+    .tool-chip{background:var(--gray-100);border:1px solid var(--gray-200);border-radius:5px;padding:3px 8px;font-size:.7rem;color:var(--gray-700);display:flex;align-items:center;gap:4px}
+    .tool-chip-remove{background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.75rem;padding:0 1px}
+    .tool-chip-remove:hover{color:var(--danger)}
+
+    /* Tool buttons */
+    .btn-tool{display:block;width:100%;padding:10px;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:auto}
+    .btn-tool-green{background:var(--success);color:#fff}
+    .btn-tool-green:hover:not(:disabled){background:#15803D}
+    .btn-tool-blue{background:var(--brand);color:#fff}
+    .btn-tool-blue:hover:not(:disabled){background:var(--brand-dark)}
+    .btn-tool:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed}
+
+    /* Tool result */
+    .tool-result{display:none;padding:10px;background:var(--success-light);border:1px solid #BBF7D0;border-radius:8px}
+    .tool-result.show{display:block}
+    .tool-result-title{font-size:.8rem;font-weight:700;color:var(--success);margin-bottom:4px}
+    .tool-result-meta{font-size:.72rem;color:var(--gray-600);margin-bottom:8px}
+    .btn-tool-dl{display:block;width:100%;padding:8px;background:var(--success);color:#fff;border:none;border-radius:7px;font-size:.78rem;font-weight:700;cursor:pointer}
+    .btn-tool-dl:hover{background:#15803D}
+
+    /* Text extraction result */
+    .tool-text-result{display:none}
+    .tool-text-result.show{display:block}
+    .tool-text-area{width:100%;height:120px;border:1px solid var(--gray-200);border-radius:7px;padding:8px;font-size:.74rem;color:var(--gray-700);resize:vertical;font-family:monospace;line-height:1.5}
+    .tool-text-actions{display:flex;gap:6px;margin-top:6px}
+    .btn-copy-text{flex:1;padding:7px;background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-200);border-radius:6px;font-size:.74rem;font-weight:600;cursor:pointer}
+    .btn-copy-text:hover{background:var(--gray-200)}
+    .btn-dl-text{flex:1;padding:7px;background:var(--brand);color:#fff;border:none;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer}
+    .btn-dl-text:hover{background:var(--brand-dark)}
+
+    /* Tool progress */
+    .tool-progress{display:none;margin-top:8px}
+    .tool-progress.show{display:block}
+    .tool-progress-bar{background:var(--gray-100);border-radius:20px;height:5px;overflow:hidden;margin-bottom:4px}
+    .tool-progress-fill{height:100%;background:linear-gradient(90deg,var(--brand),#60A5FA);border-radius:20px;width:0%;transition:width .4s}
+    .tool-progress-label{font-size:.7rem;color:var(--gray-500);text-align:center}
+
+    /* Auto-retry banner */
+    .retry-banner{display:none;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:10px 14px;margin:0 22px 10px;align-items:center;gap:10px}
+    .retry-banner.show{display:flex}
+    .retry-banner-text{flex:1;font-size:.78rem;color:#92400E}
+    .btn-retry-now{background:#D97706;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap}
+
+    @media(max-width:600px){
+      .tools-grid{grid-template-columns:1fr}
+    }
     /* ── Full Mobile Responsive ── */
     @media(max-width:768px){
       .ext-promo{padding:0 12px}
@@ -359,9 +981,11 @@
       /* Cat tabs */
       .cat-tabs{gap:5px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
       .cat-tab{white-space:nowrap;font-size:.74rem;padding:5px 12px;flex-shrink:0}
-      /* Preset chips */
-      .preset-btn{padding:4px 10px}
-      .preset-name{font-size:.72rem}
+      /* Preset grid */
+      .preset-grid{grid-template-columns:1fr 1fr}
+      .preset-btn{padding:8px 10px}
+      .preset-name{font-size:.74rem}
+      .preset-req{font-size:.64rem}
       /* FAQ */
       .faq-grid{grid-template-columns:1fr}
       .faq-section{padding:0 12px}
@@ -372,6 +996,7 @@
     @media(max-width:400px){
       .cards-grid{grid-template-columns:1fr}
       .hero h1{font-size:1.35rem}
+      .preset-grid{grid-template-columns:1fr 1fr}
     }
   </style>
 </head>
@@ -381,9 +1006,10 @@
   <div class="logo">All<span>Formats</span>Ready</div>
   <div class="header-pills">
     <span class="hpill">📄 PDF</span>
-    <span class="hpill">🖼 JPG · PNG · WebP · GIF · BMP · TIFF</span>
+    <span class="hpill">🖼 JPG · PNG · WebP</span>
     <span class="hpill">🔐 Masked Aadhaar</span>
     <span class="hpill">📦 ZIP</span>
+    <a href="#passport-photo" class="hpill" style="text-decoration:none">🪪 Passport Photo</a>
   </div>
   <div class="header-badges">
     <span class="badge-free">✓ Free</span>
@@ -394,7 +1020,7 @@
 <!-- Hero -->
 <section class="hero">
   <h1>Upload once.<br><em>Every format, instantly.</em></h1>
-  <p>Stop converting documents one by one. Get PDF, JPG, PNG, WebP, GIF, BMP, TIFF, ICO — in every size — and download only what you need.</p>
+  <p>Stop converting documents one by one. Get PDF, JPG, PNG, WebP — in every size — and download only what you need.</p>
   <div class="pills">
     <div class="pill"><strong>Aadhaar</strong> for UIDAI</div>
     <div class="pill"><strong>PAN card</strong> for bank KYC</div>
@@ -411,55 +1037,10 @@
   <div class="ext-promo-card">
     <div class="ext-promo-icon">🧩</div>
     <div class="ext-promo-text">
-      <div class="ext-promo-title">Use it directly on any portal — Chrome Extension</div>
-      <div class="ext-promo-sub">Auto-detects EPFO, Bank KYC, UIDAI & 20+ portals. Convert without switching tabs.</div>
+      <div class="ext-promo-title">Chrome Extension v4 — Now with Passport Photo Tool!</div>
+      <div class="ext-promo-sub">Auto-detects 30+ portals · Passport photo generator · Conversion history · Copy to clipboard</div>
     </div>
-    <button class="btn-ext" id="btnExtDownload" onclick="downloadExtension()">⬇ Download Free →</button>
-  </div>
-</div>
-
-<!-- Extension download success modal -->
-<div id="extModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.2)">
-    <button onclick="closeExtModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9CA3AF">✕</button>
-
-    <!-- Success message -->
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:2.5rem;margin-bottom:10px">🎉</div>
-      <div style="font-size:1.1rem;font-weight:800;color:#1F2937;margin-bottom:6px">Extension downloaded! You're ahead of the curve.</div>
-      <div style="font-size:.84rem;color:#6B7280;line-height:1.5">Most people waste 30 minutes converting documents. You just found the shortcut. Now set it up in 60 seconds 👇</div>
-    </div>
-
-    <!-- How to setup -->
-    <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:14px;margin-bottom:18px">
-      <div style="font-size:.82rem;font-weight:800;color:#166534;margin-bottom:10px">⚡ Setup in 3 steps (60 seconds)</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:#1F2937">
-          <span style="background:#16A34A;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">1</span>
-          <span>Open Chrome → go to <strong>chrome://extensions</strong> → enable <strong>Developer mode</strong> (top right toggle)</span>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:#1F2937">
-          <span style="background:#16A34A;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">2</span>
-          <span>Click <strong>Load unpacked</strong> → select the <strong>extension</strong> folder from the ZIP you just downloaded</span>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:#1F2937">
-          <span style="background:#16A34A;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">3</span>
-          <span>Pin it to your Chrome toolbar → open any government portal → click the 🧩 icon → done!</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Share with friends -->
-    <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:8px">🙌 Share with friends who struggle with document formats:</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="shareWhatsApp()" style="flex:1;min-width:120px;padding:9px 10px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">📱 WhatsApp</button>
-      <button onclick="shareInstagram()" style="flex:1;min-width:120px;padding:9px 10px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">📸 Instagram</button>
-      <button onclick="shareLinkedIn()" style="flex:1;min-width:120px;padding:9px 10px;background:#0A66C2;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">💼 LinkedIn</button>
-    </div>
-
-    <div style="text-align:center;margin-top:14px">
-      <a href="#ext-setup-guide" onclick="closeExtModal()" style="font-size:.76rem;color:#2563EB;font-weight:600;text-decoration:none">📖 View detailed setup guide below ↓</a>
-    </div>
+    <a class="btn-ext" href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" rel="noopener">⬇ Download Free →</a>
   </div>
 </div>
 
@@ -467,10 +1048,10 @@
 <div class="upload-wrap">
 <div class="card" id="uploadCard">
   <div class="drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif,.svg,.psd" multiple/>
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif" multiple/>
     <span class="drop-icon">📂</span>
     <div class="drop-title">Drop your document here or click to browse</div>
-    <div class="drop-sub">PDF, JPG, PNG, WebP, GIF, BMP, TIFF, SVG, PSD, HEIC — max 15MB · Select multiple images at once</div>
+    <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 15MB · Select multiple images at once</div>
     <div class="drop-formats">
       <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
       <span class="drop-fmt">WebP</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">BMP</span>
@@ -524,9 +1105,13 @@
       <div class="progress-step" data-step="4"><div class="step-dot"></div>Packaging everything</div>
     </div>
     <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
-    <div id="progressLabel" style="font-size:.75rem;color:var(--gray-500);text-align:center;margin-top:4px;min-height:16px"></div>
   </div>
 
+  <div class="retry-banner" id="retryBanner">
+    <span style="font-size:1.1rem">⏳</span>
+    <span class="retry-banner-text" id="retryBannerText">Server is waking up…</span>
+    <button class="btn-retry-now" id="btnRetryNow">Retry Now →</button>
+  </div>
   <button class="btn-convert" id="btnConvert" disabled>Generate All Formats →</button>
 
   <!-- Privacy row with countdown -->
@@ -570,10 +1155,6 @@
     </div>
   </div>
   <!-- Portal presets INSIDE results -->
-  <div class="size-summary" id="sizeSummary" style="display:none">
-    <span class="size-summary-icon">📦</span>
-    <span id="sizeSummaryText"></span>
-  </div>
   <div class="preset-section" id="presetSection">
     <div class="preset-label">🏛 Choose your portal to highlight the right files <span>NEW</span></div>
     <div class="preset-grid" id="presetGrid"></div>
@@ -621,8 +1202,174 @@
       <div class="how-step-num" style="background:#1D4ED8">🧩</div>
       <div class="how-step-content">
         <div class="how-step-title" style="color:#1E40AF">Pro tip — Use the Chrome Extension!</div>
-        <div class="how-step-desc" style="color:#3B82F6">Install our free Chrome extension and convert documents directly while filling any form — without switching tabs. Auto-detects EPFO, Bank KYC, UIDAI, Naukri, LinkedIn and 20+ more portals.</div>
-        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ Download Extension Free →</a>
+        <div class="how-step-desc" style="color:#3B82F6">Install our Chrome Extension v4 — convert documents while filling any form without switching tabs. Auto-detects 30+ portals. Includes a Passport Photo generator and conversion history!</div>
+        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ ⬇ Download Extension v4 Free →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Extra Tools: PDF Merge + PDF to Text -->
+<section class="tools-section">
+  <div class="tools-header">
+    <div class="tools-title">🛠️ More Free Tools</div>
+    <div class="tools-sub">PDF merge and text extraction — no sign-up, files deleted instantly</div>
+  </div>
+  <div class="tools-grid">
+
+    <!-- PDF Merge -->
+    <div class="tool-card">
+      <div class="tool-card-title">📎 Merge PDFs</div>
+      <div class="tool-card-desc">Combine multiple PDF files into one. Upload up to 10 PDFs — order matters.</div>
+      <div class="tool-drop" id="mergeDropZone">
+        <input type="file" id="mergeFileInput" accept=".pdf" multiple/>
+        <span class="tool-drop-icon">📄</span>
+        <div class="tool-drop-text">Drop PDF files here</div>
+        <div class="tool-drop-sub">Multiple PDFs · Max 30MB total</div>
+      </div>
+      <div class="tool-chips" id="mergeChips"></div>
+      <div class="tool-progress" id="mergeProgress">
+        <div class="tool-progress-bar"><div class="tool-progress-fill" id="mergeFill"></div></div>
+        <div class="tool-progress-label" id="mergeLabel">Merging…</div>
+      </div>
+      <div class="tool-result" id="mergeResult">
+        <div class="tool-result-title">✅ PDFs merged successfully!</div>
+        <div class="tool-result-meta" id="mergeMeta"></div>
+        <button class="btn-tool-dl" id="btnMergeDl">⬇ Download Merged PDF</button>
+      </div>
+      <button class="btn-tool btn-tool-green" id="btnMerge" disabled>Merge PDFs →</button>
+    </div>
+
+    <!-- PDF to Text -->
+    <div class="tool-card">
+      <div class="tool-card-title">📝 PDF to Text</div>
+      <div class="tool-card-desc">Extract all text from a PDF. Perfect for scanned forms, certificates, and documents.</div>
+      <div class="tool-drop" id="textDropZone">
+        <input type="file" id="textFileInput" accept=".pdf"/>
+        <span class="tool-drop-icon">📋</span>
+        <div class="tool-drop-text">Drop a PDF here</div>
+        <div class="tool-drop-sub">Single PDF · Max 10MB</div>
+      </div>
+      <div class="tool-progress" id="textProgress">
+        <div class="tool-progress-bar"><div class="tool-progress-fill" id="textFill"></div></div>
+        <div class="tool-progress-label" id="textLabel">Extracting text…</div>
+      </div>
+      <div class="tool-text-result" id="textResult">
+        <div class="tool-result-title" style="color:var(--brand);background:var(--brand-light);border-color:#BFDBFE" id="textResultTitle"></div>
+        <textarea class="tool-text-area" id="textArea" readonly placeholder="Extracted text will appear here…"></textarea>
+        <div class="tool-text-actions">
+          <button class="btn-copy-text" id="btnCopyText">📋 Copy All</button>
+          <button class="btn-dl-text" id="btnDlText">⬇ Download .txt</button>
+        </div>
+      </div>
+      <button class="btn-tool btn-tool-blue" id="btnExtractText" disabled>Extract Text →</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- Passport Photo Tool -->
+<section class="pp-section" id="passport-photo">
+  <div class="pp-section-header">
+    <div class="pp-section-title">🪪 Passport Photo Generator</div>
+    <div class="pp-section-sub">Create perfect passport photos for Indian Passport, Visa, College, JEE, NEET — 300 DPI quality, free</div>
+  </div>
+  <div class="pp-tool">
+    <div class="pp-tool-inner">
+      <!-- Left: Controls -->
+      <div class="pp-left">
+        <div style="font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:8px">📐 Select size preset</div>
+        <div class="pp-web-presets" id="ppWebPresets">
+          <div class="pp-web-preset active" data-w="35" data-h="45" data-name="Indian Passport">
+            <div class="pp-web-preset-name">🇮🇳 Passport</div>
+            <div class="pp-web-preset-size">35×45mm</div>
+          </div>
+          <div class="pp-web-preset" data-w="25" data-h="35" data-name="Visa Photo">
+            <div class="pp-web-preset-name">✈️ Visa</div>
+            <div class="pp-web-preset-size">25×35mm</div>
+          </div>
+          <div class="pp-web-preset" data-w="30" data-h="40" data-name="College Admission">
+            <div class="pp-web-preset-name">🎓 College</div>
+            <div class="pp-web-preset-size">30×40mm</div>
+          </div>
+          <div class="pp-web-preset" data-w="51" data-h="51" data-name="US Visa">
+            <div class="pp-web-preset-name">🇺🇸 US Visa</div>
+            <div class="pp-web-preset-size">51×51mm</div>
+          </div>
+          <div class="pp-web-preset" data-w="40" data-h="40" data-name="Aadhaar / PAN">
+            <div class="pp-web-preset-name">🪪 Aadhaar</div>
+            <div class="pp-web-preset-size">40×40mm</div>
+          </div>
+          <div class="pp-web-preset" data-w="35" data-h="35" data-name="Job Portal">
+            <div class="pp-web-preset-name">💼 Job Portal</div>
+            <div class="pp-web-preset-size">35×35mm</div>
+          </div>
+        </div>
+
+        <!-- Custom size -->
+        <div style="font-size:.76rem;font-weight:600;color:var(--gray-600);margin-bottom:6px">✏️ Custom size</div>
+        <div class="pp-web-custom">
+          <input type="number" id="ppWebW" placeholder="W" min="1" step="0.1"/>
+          <span class="pp-sep">×</span>
+          <input type="number" id="ppWebH" placeholder="H" min="1" step="0.1"/>
+          <select id="ppWebUnit">
+            <option value="mm">mm</option>
+            <option value="px">px</option>
+            <option value="in">inch</option>
+          </select>
+          <button class="btn-pp-apply" id="ppWebApply">Apply</button>
+        </div>
+
+        <!-- Background -->
+        <div class="pp-web-bg-row">
+          <span class="pp-web-bg-label">Background:</span>
+          <div class="pp-web-bg-btns">
+            <div class="pp-web-bg-btn pp-web-bg-white active" data-color="#ffffff" title="White"></div>
+            <div class="pp-web-bg-btn pp-web-bg-blue" data-color="#1E3A5F" title="Blue"></div>
+            <div class="pp-web-bg-btn pp-web-bg-gray" data-color="#D1D5DB" title="Gray"></div>
+            <div class="pp-web-color-wrap" title="Custom color">
+              <input type="color" id="ppWebColorPicker" value="#ffffff"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload -->
+        <div class="pp-web-upload" id="ppWebUpload">
+          <input type="file" id="ppWebFileInput" accept=".jpg,.jpeg,.png,.webp,.heic"/>
+          <span class="pp-web-upload-icon">📷</span>
+          <div class="pp-web-upload-text">Upload your photo</div>
+          <div class="pp-web-upload-sub">JPG, PNG, WebP, HEIC</div>
+        </div>
+
+        <!-- Zoom row -->
+        <div class="pp-web-zoom-row" id="ppWebZoomRow" style="display:none">
+          <span class="pp-web-zoom-label">Zoom:</span>
+          <input type="range" class="pp-web-zoom-slider" id="ppWebZoom" min="50" max="200" value="100"/>
+          <span class="pp-web-zoom-val" id="ppWebZoomVal">100%</span>
+          <button class="pp-web-reset" id="ppWebReset">↺</button>
+        </div>
+
+        <button class="btn-pp-web-gen" id="btnPpWebGen" disabled>Generate Passport Photo →</button>
+      </div>
+
+      <!-- Right: Canvas + Result -->
+      <div class="pp-right">
+        <div class="pp-web-canvas-wrap" id="ppWebCanvasWrap">
+          <canvas id="ppWebCanvas" style="max-width:100%;display:block;cursor:crosshair"></canvas>
+        </div>
+        <div class="pp-web-result" id="ppWebResult">
+          <img id="ppWebResultImg" class="pp-web-result-preview" src="" alt="Passport photo preview"/>
+          <div class="pp-web-result-meta" id="ppWebResultMeta"></div>
+          <div class="pp-web-dl-btns">
+            <button class="pp-web-dl-btn pp-web-dl-jpg" id="ppWebDlJpg">⬇ Download JPG</button>
+            <button class="pp-web-dl-btn pp-web-dl-png" id="ppWebDlPng">⬇ Download PNG</button>
+          </div>
+        </div>
+        <div id="ppWebPlaceholder" style="text-align:center;padding:40px 20px;color:var(--gray-400)">
+          <div style="font-size:2.5rem;margin-bottom:10px">🖼️</div>
+          <div style="font-size:.84rem">Upload a photo to get started.<br>Crop preview will appear here.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -633,54 +1380,6 @@
   <div class="faq-section-title">Common questions</div>
   <div class="faq-section-sub">Everything you need to know about AllFormatsReady</div>
   <div class="faq-grid" id="faqGrid"></div>
-</section>
-
-<!-- Extension Setup Guide -->
-<section id="ext-setup-guide" style="max-width:620px;margin:0 auto 48px;padding:0 20px">
-  <div style="text-align:center;margin-bottom:20px">
-    <div style="font-size:1.25rem;font-weight:800;color:#1F2937;margin-bottom:6px">🧩 How to install the Chrome Extension</div>
-    <div style="font-size:.85rem;color:#6B7280">Takes less than 60 seconds. No Chrome Web Store needed.</div>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:12px">
-    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
-      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">1</div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Download the extension ZIP</div>
-        <div style="font-size:.78rem;color:#6B7280">Click the <strong>"Download Free"</strong> button above. A ZIP file will download to your computer.</div>
-      </div>
-    </div>
-    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
-      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">2</div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Extract the ZIP file</div>
-        <div style="font-size:.78rem;color:#6B7280">Right-click the downloaded ZIP → <strong>Extract All</strong> → choose a folder you'll remember (like Desktop).</div>
-      </div>
-    </div>
-    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
-      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">3</div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Open Chrome Extensions page</div>
-        <div style="font-size:.78rem;color:#6B7280">In Chrome, type <strong>chrome://extensions</strong> in the address bar and press Enter. Enable <strong>Developer mode</strong> using the toggle in the top right corner.</div>
-      </div>
-    </div>
-    <div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
-      <div style="background:#2563EB;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">4</div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:#1F2937;margin-bottom:3px">Load the extension</div>
-        <div style="font-size:.78rem;color:#6B7280">Click <strong>Load unpacked</strong> → navigate to the extracted folder → select the <strong>extension</strong> folder inside it → click Select Folder.</div>
-      </div>
-    </div>
-    <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px">
-      <div style="background:#16A34A;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;flex-shrink:0">5</div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:#166534;margin-bottom:3px">Pin it & start using! 🎉</div>
-        <div style="font-size:.78rem;color:#166534">Click the 🧩 puzzle icon in Chrome toolbar → pin AllFormatsReady. Now open any portal (EPFO, Bank KYC, UIDAI) and click the extension icon to convert right there!</div>
-      </div>
-    </div>
-  </div>
-  <div style="text-align:center;margin-top:16px;font-size:.78rem;color:#6B7280">
-    Having trouble? <a href="https://github.com/MOHITH-KVS/allformatsready" target="_blank" style="color:#2563EB;font-weight:600">Visit our GitHub</a> for help.
-  </div>
 </section>
 
 <footer>
@@ -696,10 +1395,14 @@
     {icon:"🏦", q:"How to compress Aadhaar PDF under 200KB for bank KYC?", a:"Upload your Aadhaar PDF — you'll see a 'JPG under 200KB' card in the results. Click Download on just that file. No need to download everything else."},
     {icon:"📷", q:"How to convert Aadhaar card PDF to JPG online free?", a:"Upload your Aadhaar PDF above. AllFormatsReady converts it to JPG in multiple sizes automatically — no sign-up, completely free."},
     {icon:"🔐", q:"What is masked Aadhaar and why do portals ask for it?", a:"Masked Aadhaar hides the first 8 digits of your 12-digit number, showing only the last 4. UIDAI recommends it to protect your identity. We auto-generate it when Aadhaar is detected in your file."},
-    {icon:"📄", q:"Can I convert a multi-page PDF? Which pages are converted?", a:"Yes! AllFormatsReady converts every page of your PDF. You'll see separate image cards for each page — Page 1, Page 2, etc. You can download them individually or all at once as a ZIP."},
-    {icon:"📝", q:"Can I upload a Word document (DOCX)?", a:"Yes. Upload any DOCX file and we'll convert it to PDF, JPG, PNG, and WebP automatically. No Microsoft Word needed."},
+    {icon:"📄", q:"Can I convert a multi-page PDF? Which pages are converted?", a:"Yes! AllFormatsReady converts every page of your PDF. You'll see separate image cards for each page — Page 1, Page 2, etc. You can download them all as a combined DOCX or individually."},
+    {icon:"📸", q:"Does it support HEIC files from iPhone?", a:"Yes! HEIC and HEIF files from iPhone are fully supported. Upload your iPhone photo and get JPG, PNG, WebP, and PDF versions instantly."},
+    {icon:"🖼️", q:"Can I upload multiple images at once?", a:"Yes! Select multiple JPG/PNG images at once — you'll get individual formats for each image plus a combined PDF and combined DOCX with all images together."},
+    {icon:"🪪", q:"How do I create a passport photo online free?", a:"Use the Passport Photo section on this page. Upload your photo, select your size (Indian Passport 35×45mm, Visa, College, JEE, NEET etc.), adjust the crop, choose background color, and download at 300 DPI quality."},
+    {icon:"🧩", q:"What is the Chrome Extension and how is it different?", a:"The Chrome Extension lets you convert documents directly while filling any form — without switching tabs. It auto-detects 30+ Indian portals (EPFO, HDFC, SBI, UIDAI, Naukri etc.) and shows the right format at the top. Download free from GitHub."},
     {icon:"🛡️", q:"Is my Aadhaar card safe to upload here?", a:"Yes. Your file is processed instantly on our server and permanently deleted within 60 seconds. You can see the live countdown timer after uploading. We never store, read, or share your documents."},
-    {icon:"📦", q:"Do I need to download everything as a ZIP?", a:"No — that's the point! Each format has its own Download button. If you only need JPG under 200KB, download just that. ZIP is available if you want everything."},
+    {icon:"📦", q:"Do I need to download everything as a ZIP?", a:"No — that's the point! Each format has its own Download button. If you only need JPG under 200KB, download just that. ZIP is available if you want everything at once."},
+    {icon:"📝", q:"Can I upload a Word document (DOCX)?", a:"DOCX upload is not supported yet — Word files need LibreOffice to render properly which isn't available on free hosting. Instead, export your Word doc as PDF from Microsoft Word, then upload the PDF here."},
     {icon:"🆓", q:"Is AllFormatsReady completely free? Any hidden charges?", a:"100% free. No account, no sign-up, no credit card, no watermarks, no hidden charges. We plan to keep the core tool free forever."},
   ];
 
@@ -726,7 +1429,6 @@
 
   // ── State ──
   let selectedFile = null;
-  let selectedFiles = [];
   let allFiles = [];
   let activeCategory = "All";
   let timerInterval = null;
@@ -747,7 +1449,6 @@
   const btnConvert      = document.getElementById("btnConvert");
   const progressWrap    = document.getElementById("progressWrap");
   const progressFill    = document.getElementById("progressFill");
-  const progressLabel   = document.getElementById("progressLabel");
   const errorWrap       = document.getElementById("errorWrap");
   const resultsSection  = document.getElementById("resultsSection");
   const resultsSub      = document.getElementById("resultsSub");
@@ -786,7 +1487,7 @@
   }
 
   function fmtBadgeClass(fmt){
-    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx",GIF:"fmt-gif",BMP:"fmt-bmp",TIFF:"fmt-tiff",ICO:"fmt-ico"};
+    const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx"};
     return m[fmt] || "fmt-jpg";
   }
 
@@ -814,63 +1515,8 @@
     multipageNotice.classList.toggle("show", isPDF(file.name));
   }
 
-  function setMultipleFiles(files) {
-    selectedFiles = Array.from(files);
-    selectedFile = selectedFiles[0];
-
-    // Validate total size
-    const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
-    if(totalSize > 15 * 1024 * 1024){
-      errorWrap.textContent = "⚠️ Total size too large. Maximum is 15MB across all files.";
-      errorWrap.classList.add("show");
-      fileInput.value = "";
-      return;
-    }
-
-    // Show chips
-    const multiPreview = document.getElementById("multiPreview");
-    multiPreview.innerHTML = "";
-    selectedFiles.forEach((f, i) => {
-      const chip = document.createElement("div");
-      chip.className = "multi-chip";
-      chip.innerHTML = `<span>${getFileIcon(f.name)}</span><span>${f.name}</span>
-        <button class="chip-remove" data-idx="${i}" title="Remove">✕</button>`;
-      multiPreview.appendChild(chip);
-    });
-    multiPreview.classList.add("show");
-
-    // Chip remove handlers
-    multiPreview.querySelectorAll(".chip-remove").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const idx = parseInt(btn.dataset.idx);
-        selectedFiles.splice(idx, 1);
-        if(selectedFiles.length === 0){ reset(); return; }
-        if(selectedFiles.length === 1){ setFile(selectedFiles[0]); return; }
-        setMultipleFiles(selectedFiles);
-      });
-    });
-
-    // Show notice
-    const multiNotice = document.getElementById("multiNotice");
-    const multiNoticeText = document.getElementById("multiNoticeText");
-    if(multiNotice && multiNoticeText){
-      multiNoticeText.textContent = `${selectedFiles.length} images selected — will be combined into one PDF & DOCX too`;
-      multiNotice.classList.add("show");
-    }
-
-    filePreview.classList.remove("show");
-    dropZone.style.display = "none";
-    btnConvert.disabled = false;
-    errorWrap.classList.remove("show");
-    resultsSection.style.display = "none";
-    progressWrap.classList.remove("show");
-    sensitiveNotice.classList.remove("show");
-    multipageNotice.classList.remove("show");
-    clearPreset();
-  }
-
   function reset(){
-    selectedFile = null; selectedFiles = []; allFiles = []; totalPages = 1;
+    selectedFile = null; allFiles = []; totalPages = 1;
     fileInput.value = "";
     filePreview.classList.remove("show");
     sensitiveNotice.classList.remove("show");
@@ -884,12 +1530,6 @@
     progressFill.style.width = "0%";
     stopTimer();
     document.querySelectorAll(".progress-step").forEach(s => s.classList.remove("active","done"));
-    const mp = document.getElementById("multiPreview");
-    if(mp){ mp.innerHTML = ""; mp.classList.remove("show"); }
-    const mn = document.getElementById("multiNotice");
-    if(mn) mn.classList.remove("show");
-    const ss = document.getElementById("sizeSummary");
-    if(ss) ss.style.display = "none";
   }
 
   fileInput.addEventListener("change", () => {
@@ -1034,8 +1674,6 @@
         const a = document.createElement("a");
         a.href=url; a.download=name; a.click();
         URL.revokeObjectURL(url);
-        // GA: track download
-        gtag('event', 'download', { format: ext.toUpperCase(), file_name: name });
       });
     });
 
@@ -1155,10 +1793,10 @@
       const btn = document.createElement("button");
       btn.className = "preset-btn";
       btn.dataset.id = p.id;
-      btn.title = p.req;
       btn.innerHTML = `
         <span class="preset-icon">${p.icon}</span>
         <span class="preset-name">${p.name}</span>
+        <span class="preset-req">${p.req}</span>
       `;
       btn.addEventListener("click", () => applyPreset(p));
       grid.appendChild(btn);
@@ -1170,8 +1808,6 @@
       clearPreset(); return;
     }
     activePreset = portal.id;
-    // GA: track preset click
-    gtag('event', 'preset_click', { portal: portal.id, portal_name: portal.name });
 
     // Update tab styles
     document.querySelectorAll(".preset-btn").forEach(b => b.classList.toggle("active", b.dataset.id === portal.id));
@@ -1222,7 +1858,7 @@
   function updateWhatsAppLink(){
     const filesCount = allFiles.length || 0;
     const text = encodeURIComponent(
-      "🔥 *AllFormatsReady* — Upload once, get every format instantly!\n\n" +
+      "🔥 *AllFormatsReady* — Game changer for government forms!\n\n" +
       "Upload Aadhaar/PAN/any document ONCE → get ALL formats instantly\n" +
       "✅ PDF compressed\n" +
       "✅ JPG under 100KB, 200KB, 500KB\n" +
@@ -1259,8 +1895,6 @@
     const a = document.createElement("a");
     a.href=url; a.download="allformatsready.zip"; a.click();
     URL.revokeObjectURL(url);
-    // GA: track ZIP download
-    gtag('event', 'download_zip', { file_count: allFiles.length });
   });
 
 
@@ -1383,10 +2017,6 @@
       allFiles = data.files;
       totalPages = data.total_pages || 1;
 
-      // GA: track conversion
-      const ext = selectedFile ? selectedFile.name.split(".").pop().toLowerCase() : "unknown";
-      gtag('event', 'convert', { file_type: ext, file_count: allFiles.length });
-
       progressFill.style.width = "100%";
       setStep(STEPS.length);
 
@@ -1405,11 +2035,18 @@
       btnConvert.disabled = false;
       const msg = err.message || "";
       if(msg.includes("fetch") || msg.includes("network") || msg.includes("Failed")){
-        errorWrap.textContent = "⚠️ Server is waking up (free tier). Please wait 30 seconds and try again.";
+        errorWrap.textContent = "⚠️ Server is waking up. See countdown below.";
+        errorWrap.classList.add("show");
+        if(window.startRetryCountdown){
+          window.startRetryCountdown(() => {
+            errorWrap.classList.remove("show");
+            btnConvert.click();
+          });
+        }
       } else {
         errorWrap.textContent = "⚠️ " + (msg || "Something went wrong. Please try again.");
+        errorWrap.classList.add("show");
       }
-      errorWrap.classList.add("show");
       stopTimer();
     }
   });
@@ -1418,25 +2055,6 @@
     resultsSection.style.display = "block";
     const pageText = totalPages > 1 ? ` · ${totalPages} pages converted` : "";
     resultsSub.textContent = `${allFiles.length} files generated${pageText} — download only what you need`;
-
-    // ── Before/After size summary ──
-    const sizeSummary = document.getElementById("sizeSummary");
-    const sizeSummaryText = document.getElementById("sizeSummaryText");
-    if(selectedFile && allFiles.length){
-      const origBytes = selectedFile.size;
-      const bestBytes = Math.min(...allFiles.map(f => f.size_bytes));
-      const origMB = origBytes >= 1048576 ? (origBytes/1048576).toFixed(1)+"MB" : (origBytes/1024).toFixed(0)+"KB";
-      const bestKB = bestBytes >= 1048576 ? (bestBytes/1048576).toFixed(1)+"MB" : (bestBytes/1024).toFixed(0)+"KB";
-      const saved = Math.round((1 - bestBytes/origBytes)*100);
-      if(saved > 0){
-        sizeSummaryText.textContent = `Original: ${origMB} → Best result: ${bestKB} (${saved}% smaller)`;
-        sizeSummary.style.display = "flex";
-      } else {
-        sizeSummary.style.display = "none";
-      }
-    } else {
-      sizeSummary.style.display = "none";
-    }
 
     const cats = ["All", ...new Set(allFiles.map(f => f.category))];
     catTabs.innerHTML = "";
@@ -1454,48 +2072,6 @@
     buildPresets();
   resultsSection.scrollIntoView({behavior:"smooth", block:"start"});
   }
-
-  // ── Extension download + share ──
-  function downloadExtension() {
-    const link = document.createElement("a");
-    link.href = "https://github.com/MOHITH-KVS/allformatsready/releases/download/v1.0.0/extension.zip";
-    link.download = "allformatsready-extension.zip";
-    link.click();
-    gtag('event', 'extension_download');
-    setTimeout(() => {
-      document.getElementById("extModal").style.display = "flex";
-    }, 1500);
-  }
-
-  function closeExtModal() {
-    document.getElementById("extModal").style.display = "none";
-  }
-
-  function shareWhatsApp() {
-    const msg = encodeURIComponent("🔥 Found this amazing free tool!\n\nAllFormatsReady — Upload any document ONCE and get every format instantly.\n✅ JPG under 100KB, 200KB, 500KB\n✅ PDF compressed\n✅ Works for EPFO, Bank KYC, UIDAI, Passport & more\n✅ Chrome Extension auto-detects your portal\n\nNo sign-up. No watermark. Files deleted in 60 seconds 🔒\n\n👉 Try it free: https://allformatsready.vercel.app");
-    window.open(`https://wa.me/?text=${msg}`, "_blank");
-    gtag('event', 'share', { platform: 'whatsapp' });
-  }
-
-  function shareInstagram() {
-    const caption = `🚀 Stop wasting time converting documents!\n\nAllFormatsReady — Upload ONCE, get every format instantly 🔥\n✅ JPG in every size\n✅ PDF compressed\n✅ Works for EPFO, Bank KYC, UIDAI & 20+ Indian portals\n✅ Chrome Extension that auto-detects your portal\n\nFree. No sign-up. Try it 👇\nallformatsready.vercel.app\n\n#AllFormatsReady #Indiatech #EPFO #Aadhaar #FreeTools #DocumentConverter`;
-    navigator.clipboard.writeText(caption).then(() => {
-      alert("📸 Caption copied to clipboard! Open Instagram and paste it in your story or post.");
-    });
-    gtag('event', 'share', { platform: 'instagram' });
-  }
-
-  function shareLinkedIn() {
-    const url = encodeURIComponent("https://allformatsready.vercel.app");
-    const title = encodeURIComponent("AllFormatsReady — Upload Once, Get Every Format Instantly");
-    const summary = encodeURIComponent("Stop wasting 45 minutes converting documents for EPFO, Bank KYC, UIDAI portals. Upload once → get JPG in every size, PDF compressed, PNG, WebP, DOCX instantly. Free Chrome Extension included. No sign-up. No watermark.");
-    window.open(`https://www.linkedin.com/shareArticle?mini=true&url=${url}&title=${title}&summary=${summary}`, "_blank");
-    gtag('event', 'share', { platform: 'linkedin' });
-  }
-
-  document.getElementById("extModal").addEventListener("click", function(e) {
-    if(e.target === this) closeExtModal();
-  });
 
 </script>
 
