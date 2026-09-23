@@ -23,6 +23,43 @@
     .ext-badge{background:var(--brand-light);color:var(--brand);font-size:.58rem;font-weight:700;padding:2px 6px;border-radius:8px}
 
 
+
+    /* PDF Merge + Text tab */
+    .tool-section{padding:10px}
+    .tool-drop-ext{border:2px dashed var(--gray-200);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;position:relative;margin-bottom:8px}
+    .tool-drop-ext:hover,.tool-drop-ext.dragover{border-color:var(--brand);background:var(--brand-light)}
+    .tool-drop-ext input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .tool-drop-icon{font-size:1.4rem;display:block;margin-bottom:4px}
+    .tool-drop-text{font-size:.76rem;font-weight:600;color:var(--gray-600)}
+    .tool-drop-sub{font-size:.64rem;color:var(--gray-400);margin-top:2px}
+    .tool-chips-ext{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;min-height:0}
+    .tool-chip-ext{background:var(--gray-100);border:1px solid var(--gray-200);border-radius:5px;padding:2px 7px;font-size:.68rem;color:var(--gray-700);display:flex;align-items:center;gap:3px}
+    .chip-rm{background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.72rem;padding:0 1px}
+    .chip-rm:hover{color:var(--danger)}
+    .tool-prog-ext{display:none;margin-bottom:6px}
+    .tool-prog-ext.show{display:block}
+    .tool-prog-bar{background:var(--gray-100);border-radius:20px;height:4px;overflow:hidden;margin-bottom:4px}
+    .tool-prog-fill{height:100%;background:linear-gradient(90deg,var(--brand),#60A5FA);border-radius:20px;width:0%;transition:width .4s}
+    .tool-prog-label{font-size:.68rem;color:var(--gray-500);text-align:center}
+    .tool-result-ext{display:none;padding:8px 10px;background:var(--success-light);border:1px solid #BBF7D0;border-radius:7px;margin-bottom:6px}
+    .tool-result-ext.show{display:block}
+    .tool-result-title{font-size:.76rem;font-weight:700;color:var(--success);margin-bottom:4px}
+    .tool-result-meta{font-size:.68rem;color:var(--gray-600);margin-bottom:6px}
+    .btn-tool-dl-ext{display:block;width:100%;padding:7px;background:var(--success);color:#fff;border:none;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;margin-bottom:4px}
+    .btn-tool-dl-ext:hover{background:#15803D}
+    .btn-tool-ext{display:block;width:100%;padding:9px;border:none;border-radius:7px;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .2s}
+    .btn-green{background:var(--success);color:#fff}
+    .btn-green:hover:not(:disabled){background:#15803D}
+    .btn-blue{background:var(--brand);color:#fff}
+    .btn-blue:hover:not(:disabled){background:var(--brand-dark)}
+    .btn-tool-ext:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed}
+    .text-area-ext{width:100%;height:100px;border:1px solid var(--gray-200);border-radius:6px;padding:7px;font-size:.7rem;color:var(--gray-700);resize:vertical;font-family:monospace;line-height:1.5;margin-bottom:5px}
+    .text-actions{display:flex;gap:5px}
+    .btn-copy-ext{flex:1;padding:6px;background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-200);border-radius:5px;font-size:.68rem;font-weight:600;cursor:pointer}
+    .btn-copy-ext:hover{background:var(--gray-200)}
+    .btn-dl-txt{flex:1;padding:6px;background:var(--brand);color:#fff;border:none;border-radius:5px;font-size:.68rem;font-weight:700;cursor:pointer}
+    .tool-warn{padding:7px 9px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;font-size:.7rem;color:#92400E;margin-bottom:6px;display:none}
+    .tool-warn.show{display:block}
     /* Onboarding */
     .onboard-wrap{padding:16px 14px}
     .onboard-logo{text-align:center;font-size:1.1rem;font-weight:800;color:var(--brand);margin-bottom:4px}
@@ -299,7 +336,9 @@
 <!-- Tab bar -->
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="convert">📄 Convert</button>
-  <button class="tab-btn" data-tab="passport">🪪 Passport Photo</button>
+  <button class="tab-btn" data-tab="passport">🪪 Photo</button>
+  <button class="tab-btn" data-tab="merge">📎 Merge</button>
+  <button class="tab-btn" data-tab="textex">📝 Text</button>
   <button class="tab-btn" data-tab="history">🕐 History</button>
 </div>
 
@@ -452,6 +491,55 @@
     </div>
 
     <button class="btn-pp-generate" id="btnPpGenerate" disabled>Generate Passport Photo →</button>
+  </div>
+</div>
+
+
+<!-- ═══ TAB 3: PDF MERGE ═══ -->
+<div class="tab-panel" id="tab-merge">
+  <div class="tool-section">
+    <div style="font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:6px">📎 Merge multiple PDFs into one</div>
+    <div class="tool-drop-ext" id="mergeDropExt">
+      <input type="file" id="mergeInputExt" accept=".pdf" multiple/>
+      <span class="tool-drop-icon">📄</span>
+      <div class="tool-drop-text">Drop PDF files here</div>
+      <div class="tool-drop-sub">Up to 10 PDFs · Max 30MB total</div>
+    </div>
+    <div class="tool-chips-ext" id="mergeChipsExt"></div>
+    <div class="tool-prog-ext" id="mergeProgExt">
+      <div class="tool-prog-bar"><div class="tool-prog-fill" id="mergeFillExt"></div></div>
+      <div class="tool-prog-label" id="mergeLabelExt">Merging…</div>
+    </div>
+    <div class="tool-result-ext" id="mergeResultExt">
+      <div class="tool-result-title">✅ PDFs merged!</div>
+      <div class="tool-result-meta" id="mergeMetaExt"></div>
+      <button class="btn-tool-dl-ext" id="btnMergeDlExt">⬇ Download Merged PDF</button>
+    </div>
+    <button class="btn-tool-ext btn-green" id="btnMergeExt" disabled>Merge PDFs →</button>
+  </div>
+</div>
+
+<!-- ═══ TAB 4: PDF TO TEXT ═══ -->
+<div class="tab-panel" id="tab-textex">
+  <div class="tool-section">
+    <div style="font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:6px">📝 Extract text from a PDF</div>
+    <div class="tool-drop-ext" id="textDropExt">
+      <input type="file" id="textInputExt" accept=".pdf"/>
+      <span class="tool-drop-icon">📋</span>
+      <div class="tool-drop-text">Drop a PDF here</div>
+      <div class="tool-drop-sub">Single PDF · Max 10MB</div>
+    </div>
+    <div class="tool-prog-ext" id="textProgExt">
+      <div class="tool-prog-bar"><div class="tool-prog-fill" id="textFillExt"></div></div>
+      <div class="tool-prog-label" id="textLabelExt">Extracting…</div>
+    </div>
+    <div class="tool-warn" id="textWarnExt">⚠️ No text found — this may be a scanned image PDF. Use Convert tab to get JPG version instead.</div>
+    <textarea class="text-area-ext" id="textAreaExt" readonly placeholder="Extracted text appears here…" style="display:none"></textarea>
+    <div class="text-actions" id="textActionsExt" style="display:none">
+      <button class="btn-copy-ext" id="btnCopyExt">📋 Copy</button>
+      <button class="btn-dl-txt" id="btnDlTxtExt">⬇ .txt</button>
+    </div>
+    <button class="btn-tool-ext btn-blue" id="btnTextExt" disabled>Extract Text →</button>
   </div>
 </div>
 

@@ -488,3 +488,247 @@ function finishOnboarding(){
 detectCurrentPortal();
 checkServer();
 initOnboarding();
+
+// ══════════════════════════════════════════
+// PDF MERGE TAB
+// ══════════════════════════════════════════
+(function(){
+  let mergeFiles = [];
+  let mergedB64 = null;
+
+  const mergeInput   = document.getElementById("mergeInputExt");
+  const mergeDropExt = document.getElementById("mergeDropExt");
+  const mergeChips   = document.getElementById("mergeChipsExt");
+  const btnMerge     = document.getElementById("btnMergeExt");
+  const mergeProg    = document.getElementById("mergeProgExt");
+  const mergeFill    = document.getElementById("mergeFillExt");
+  const mergeLabel   = document.getElementById("mergeLabelExt");
+  const mergeResult  = document.getElementById("mergeResultExt");
+  const mergeMeta    = document.getElementById("mergeMetaExt");
+  const btnMergeDl   = document.getElementById("btnMergeDlExt");
+
+  if(!mergeInput) return;
+
+  function addFiles(files){
+    Array.from(files).forEach(f => {
+      if(!f.name.toLowerCase().endsWith(".pdf")) return;
+      if(mergeFiles.length >= 10) return;
+      mergeFiles.push(f);
+    });
+    renderChips();
+    btnMerge.disabled = mergeFiles.length < 2;
+  }
+
+  function renderChips(){
+    mergeChips.innerHTML = "";
+    mergeFiles.forEach((f, i) => {
+      const chip = document.createElement("div");
+      chip.className = "tool-chip-ext";
+      chip.innerHTML = `📄 ${f.name.length > 18 ? f.name.slice(0,18)+"…" : f.name} <button class="chip-rm" data-i="${i}">✕</button>`;
+      mergeChips.appendChild(chip);
+    });
+    mergeChips.querySelectorAll(".chip-rm").forEach(btn => {
+      btn.addEventListener("click", () => {
+        mergeFiles.splice(parseInt(btn.dataset.i), 1);
+        renderChips();
+        btnMerge.disabled = mergeFiles.length < 2;
+        mergeResult.classList.remove("show");
+      });
+    });
+  }
+
+  mergeInput.addEventListener("change", () => addFiles(mergeInput.files));
+
+  mergeDropExt.addEventListener("dragover", e => { e.preventDefault(); mergeDropExt.classList.add("dragover"); });
+  mergeDropExt.addEventListener("dragleave", () => mergeDropExt.classList.remove("dragover"));
+  mergeDropExt.addEventListener("drop", e => {
+    e.preventDefault(); mergeDropExt.classList.remove("dragover");
+    addFiles(e.dataTransfer.files);
+  });
+
+  btnMerge.addEventListener("click", async () => {
+    if(mergeFiles.length < 2) return;
+    btnMerge.disabled = true;
+    mergeResult.classList.remove("show");
+    mergeProg.classList.add("show");
+    mergeFill.style.width = "20%";
+    mergeLabel.textContent = `Merging ${mergeFiles.length} PDFs…`;
+
+    try {
+      const fd = new FormData();
+      mergeFiles.forEach(f => fd.append("files", f));
+      mergeFill.style.width = "60%";
+      mergeLabel.textContent = "Processing…";
+
+      const res = await fetch(`${API_URL}/merge-pdf`, { method:"POST", body:fd });
+      mergeFill.style.width = "90%";
+
+      if(!res.ok){
+        const err = await res.json().catch(()=>({detail:"Merge failed"}));
+        throw new Error(err.detail || "Merge failed");
+      }
+
+      const data = await res.json();
+      mergedB64 = data.merged_pdf;
+      mergeFill.style.width = "100%";
+      mergeLabel.textContent = "Done!";
+
+      setTimeout(() => {
+        mergeProg.classList.remove("show");
+        mergeMeta.textContent = `${data.files_merged} PDFs · ${data.pages} pages · ${data.size_kb} KB`;
+        mergeResult.classList.add("show");
+        btnMerge.disabled = false;
+      }, 400);
+
+    } catch(err) {
+      mergeProg.classList.remove("show");
+      btnMerge.disabled = false;
+      const msg = err.message || "";
+      if(msg.includes("fetch") || msg.includes("Failed")){
+        mergeLabel.textContent = "Server waking up. Try again in 30s.";
+        mergeProg.classList.add("show");
+        mergeFill.style.width = "0%";
+      } else {
+        alert("⚠️ " + (msg || "Merge failed. Try again."));
+      }
+    }
+  });
+
+  btnMergeDl.addEventListener("click", () => {
+    if(!mergedB64) return;
+    const bc = atob(mergedB64);
+    const ba = new Uint8Array(bc.length);
+    for(let i=0;i<bc.length;i++) ba[i]=bc.charCodeAt(i);
+    const blob = new Blob([ba], {type:"application/pdf"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download="merged_allformatsready.pdf"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  });
+})();
+
+
+// ══════════════════════════════════════════
+// PDF TO TEXT TAB
+// ══════════════════════════════════════════
+(function(){
+  let txtB64 = null;
+  let textFile = null;
+
+  const textDropExt  = document.getElementById("textDropExt");
+  const textInputExt = document.getElementById("textInputExt");
+  const btnTextExt   = document.getElementById("btnTextExt");
+  const textProgExt  = document.getElementById("textProgExt");
+  const textFillExt  = document.getElementById("textFillExt");
+  const textLabelExt = document.getElementById("textLabelExt");
+  const textWarnExt  = document.getElementById("textWarnExt");
+  const textAreaExt  = document.getElementById("textAreaExt");
+  const textActionsExt = document.getElementById("textActionsExt");
+  const btnCopyExt   = document.getElementById("btnCopyExt");
+  const btnDlTxtExt  = document.getElementById("btnDlTxtExt");
+
+  if(!textDropExt) return;
+
+  function setFile(file){
+    if(!file.name.toLowerCase().endsWith(".pdf")){
+      alert("Please upload a PDF file.");
+      return;
+    }
+    textFile = file;
+    btnTextExt.disabled = false;
+    btnTextExt.textContent = `Extract from "${file.name.length > 20 ? file.name.slice(0,20)+"…" : file.name}" →`;
+    // Reset result
+    textAreaExt.style.display = "none";
+    textActionsExt.style.display = "none";
+    textWarnExt.classList.remove("show");
+    txtB64 = null;
+  }
+
+  textInputExt.addEventListener("change", () => { if(textInputExt.files[0]) setFile(textInputExt.files[0]); });
+  textDropExt.addEventListener("dragover", e => { e.preventDefault(); textDropExt.classList.add("dragover"); });
+  textDropExt.addEventListener("dragleave", () => textDropExt.classList.remove("dragover"));
+  textDropExt.addEventListener("drop", e => {
+    e.preventDefault(); textDropExt.classList.remove("dragover");
+    if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+
+  btnTextExt.addEventListener("click", async () => {
+    if(!textFile) return;
+    btnTextExt.disabled = true;
+    textWarnExt.classList.remove("show");
+    textAreaExt.style.display = "none";
+    textActionsExt.style.display = "none";
+    textProgExt.classList.add("show");
+    textFillExt.style.width = "20%";
+    textLabelExt.textContent = "Reading PDF…";
+
+    try {
+      const fd = new FormData();
+      fd.append("file", textFile);
+      textFillExt.style.width = "60%";
+      textLabelExt.textContent = "Extracting text…";
+
+      const res = await fetch(`${API_URL}/pdf-to-text`, { method:"POST", body:fd });
+      textFillExt.style.width = "90%";
+
+      if(!res.ok){
+        const err = await res.json().catch(()=>({detail:"Extraction failed"}));
+        throw new Error(err.detail || "Extraction failed");
+      }
+
+      const data = await res.json();
+      txtB64 = data.txt_b64;
+      textFillExt.style.width = "100%";
+      textLabelExt.textContent = "Done!";
+
+      setTimeout(() => {
+        textProgExt.classList.remove("show");
+        btnTextExt.disabled = false;
+
+        if(!data.has_text){
+          textWarnExt.classList.add("show");
+        } else {
+          textAreaExt.value = data.full_text;
+          textAreaExt.style.display = "block";
+          textActionsExt.style.display = "flex";
+          btnTextExt.textContent = `✅ ${data.total_pages} pages · ${data.total_chars.toLocaleString()} chars`;
+        }
+      }, 400);
+
+    } catch(err) {
+      textProgExt.classList.remove("show");
+      btnTextExt.disabled = false;
+      btnTextExt.textContent = "Extract Text →";
+      const msg = err.message || "";
+      if(msg.includes("fetch") || msg.includes("Failed")){
+        textLabelExt.textContent = "Server waking up. Try again in 30s.";
+        textProgExt.classList.add("show");
+        textFillExt.style.width = "0%";
+      } else {
+        alert("⚠️ " + (msg || "Extraction failed. Try again."));
+      }
+    }
+  });
+
+  btnCopyExt.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(textAreaExt.value);
+      btnCopyExt.textContent = "✅ Copied!";
+      setTimeout(() => btnCopyExt.textContent = "📋 Copy", 1500);
+    } catch(e) {
+      textAreaExt.select();
+      document.execCommand("copy");
+    }
+  });
+
+  btnDlTxtExt.addEventListener("click", () => {
+    if(!txtB64) return;
+    const bc=atob(txtB64); const ba=new Uint8Array(bc.length);
+    for(let i=0;i<bc.length;i++) ba[i]=bc.charCodeAt(i);
+    const blob=new Blob([ba],{type:"text/plain"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download="extracted_text.txt"; a.click();
+    URL.revokeObjectURL(url);
+  });
+})();
