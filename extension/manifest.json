@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AllFormatsReady — Document Converter",
   "short_name": "AllFormatsReady",
-  "version": "2.0.0",
+  "version": "1.1.0",
   "description": "Convert any document instantly. Auto-detects 20+ Indian portals. Passport photo tool built-in. PDF, JPG, PNG, WebP in all sizes.",
   "icons": {
     "16": "icons/icon16.png",

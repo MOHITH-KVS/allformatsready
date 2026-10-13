@@ -315,7 +315,12 @@ function renderHistory(){
     const now = Date.now();
 
     if(history.length === 0){
-      list.innerHTML = `<div class="history-empty"><span>📂</span>No conversions yet.<br>Files stored here for 24 hours.</div>`;
+      const empty = document.createElement("div");
+      empty.className = "history-empty";
+      const icon = document.createElement("span");
+      icon.textContent = "📂";
+      empty.append(icon, document.createTextNode("No conversions yet."), document.createElement("br"), document.createTextNode("Files stored here for 24 hours."));
+      list.appendChild(empty);
       clearBtn.style.display = "none";
       return;
     }
@@ -336,16 +341,25 @@ function renderHistory(){
       div.style.cssText = "cursor:default;margin-bottom:8px";
 
       // Header row
-      div.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span class="hi-icon">${icon}</span>
-          <div class="hi-info">
-            <div class="hi-name">${item.filename}</div>
-            <div class="hi-meta">${dateStr} ${timeStr} · ⏳ ${hoursLeft}h ${minsLeft}m left</div>
-          </div>
-          <span class="hi-count">${item.fileCount} files</span>
-        </div>
-      `;
+      const header = document.createElement("div");
+      header.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+      const iconEl = document.createElement("span");
+      iconEl.className = "hi-icon";
+      iconEl.textContent = icon;
+      const info = document.createElement("div");
+      info.className = "hi-info";
+      const name = document.createElement("div");
+      name.className = "hi-name";
+      name.textContent = item.filename || "Unnamed file";
+      const meta = document.createElement("div");
+      meta.className = "hi-meta";
+      meta.textContent = `${dateStr} ${timeStr} · ⏳ ${hoursLeft}h ${minsLeft}m left`;
+      info.append(name, meta);
+      const count = document.createElement("span");
+      count.className = "hi-count";
+      count.textContent = `${item.fileCount} files`;
+      header.append(iconEl, info, count);
+      div.appendChild(header);
 
       // File download buttons
       if(itemFiles.length > 0){

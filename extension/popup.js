@@ -53,19 +53,19 @@ function fmtClass(fmt){
   return m[(fmt||"").toUpperCase()]||"fmt-jpg";
 }
 function showError(msg, showRetry=false){
-  let html = "⚠️ " + msg;
-  if(showRetry) html += ' <button class="btn-retry-inline" id="btnRetryInline">Retry now →</button>';
-  errorWrap.innerHTML = html;
-  errorWrap.classList.add("show");
+  errorWrap.replaceChildren(document.createTextNode("⚠️ " + msg));
   if(showRetry){
-    document.getElementById("btnRetryInline")?.addEventListener("click", () => {
-      hideError();
-      doConvert();
-    });
+    const retry = document.createElement("button");
+    retry.className = "btn-retry-inline";
+    retry.id = "btnRetryInline";
+    retry.textContent = "Retry now →";
+    retry.addEventListener("click", () => { hideError(); doConvert(); });
+    errorWrap.append(" ", retry);
   }
+  errorWrap.classList.add("show");
 }
 function hideError(){
-  errorWrap.innerHTML="";
+  errorWrap.replaceChildren();
   errorWrap.classList.remove("show");
   if(retryTimer){ clearInterval(retryTimer); retryTimer=null; }
 }
@@ -111,7 +111,7 @@ async function detectCurrentPortal(){
 // ── File handling ──
 function setFile(file){
   if(!file) return;
-  if(file.size>15*1024*1024){ showError("File too large. Max 15MB."); return; }
+  if(file.size>10*1024*1024){ showError("File too large. Max 10MB for conversion."); return; }
   const ext=file.name.split(".").pop().toLowerCase();
   const allowed=["pdf","jpg","jpeg","png","webp","heic","heif"];
   if(!allowed.includes(ext)){
@@ -197,7 +197,7 @@ async function compressIfNeeded(file){
 btnConvert.addEventListener("click", doConvert);
 
 async function doConvert(){
-  if(!selectedFile) return;
+  if(!selectedFile || btnConvert.disabled) return;
   hideError();
   btnConvert.disabled=true;
   uploadSection.style.display="none";
@@ -228,7 +228,9 @@ async function doConvert(){
       throw new Error(err.detail||"Conversion failed");
     }
     const data=await res.json();
-    allFiles=(data.files||[]).filter(f=>ALLOWED_FORMATS.includes((f.format||"").toUpperCase()));
+    if(!data || !Array.isArray(data.files)) throw new Error("Server returned an invalid conversion response.");
+    allFiles=data.files.filter(f=>f && ALLOWED_FORMATS.includes((f.format||"").toUpperCase()) && typeof f.data_b64==="string");
+    if(allFiles.length===0) throw new Error("No downloadable files were returned. Please try again.");
 
     // Save to 24hr history
     if(window.saveConversionToHistory) window.saveConversionToHistory(selectedFile.name, allFiles);
@@ -257,11 +259,16 @@ async function doConvert(){
           hideError();
           doConvert();
         } else {
-          errorWrap.innerHTML=`⏳ Server waking up. Auto-retrying in <strong>${countdown}s</strong>… <button class="btn-retry-inline" id="btnRetryNow">Retry now →</button>`;
-          document.getElementById("btnRetryNow")?.addEventListener("click",()=>{
+          errorWrap.replaceChildren(document.createTextNode(`⏳ Server waking up. Auto-retrying in ${countdown}s… `));
+          const retryNow = document.createElement("button");
+          retryNow.className = "btn-retry-inline";
+          retryNow.id = "btnRetryNow";
+          retryNow.textContent = "Retry now →";
+          retryNow.addEventListener("click",()=>{
             clearInterval(retryTimer); retryTimer=null;
             hideError(); doConvert();
           });
+          errorWrap.appendChild(retryNow);
         }
       },1000);
       serverStatus.textContent="🔴 Waking…";
@@ -317,7 +324,10 @@ function renderCards(){
   if(recommended.length>0){
     const lbl=document.createElement("div");
     lbl.className="section-label recommended";
-    lbl.innerHTML=`⭐ Best for <strong>${activePortal.name}</strong>`;
+    lbl.append(document.createTextNode("⭐ Best for "));
+    const portalNameEl = document.createElement("strong");
+    portalNameEl.textContent = activePortal.name;
+    lbl.appendChild(portalNameEl);
     cardsList.appendChild(lbl);
     recommended.forEach(f=>cardsList.appendChild(buildCard(f,true)));
   }
@@ -431,7 +441,9 @@ function downloadFile(f){
 
 // ── ZIP ──
 btnZip.addEventListener("click",async()=>{
-  if(!window.JSZip){
+  btnZip.disabled = true;
+  try{
+    if(!window.JSZip){
     try{
       await new Promise((res,rej)=>{
         const s=document.createElement("script");
@@ -439,21 +451,22 @@ btnZip.addEventListener("click",async()=>{
         document.head.appendChild(s);
       });
     }catch(e){ showError("ZIP not available. Download individually."); return; }
-  }
-  const zip=new JSZip();
-  allFiles.forEach(f=>{
-    try{
+    }
+    if(typeof window.JSZip !== "function") throw new Error("ZIP dependency did not load correctly.");
+    const zip=new window.JSZip();
+    allFiles.forEach(f=>{
       const bc=atob(f.data_b64);
       const ba=new Uint8Array(bc.length);
       for(let i=0;i<bc.length;i++) ba[i]=bc.charCodeAt(i);
-      zip.file(`allformatsready/${f.category||"files"}/${f.name}`,ba);
-    }catch(e){}
-  });
-  const blob=await zip.generateAsync({type:"blob"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download="allformatsready.zip"; a.click();
-  URL.revokeObjectURL(url);
+      zip.file(`allformatsready/${f.category||"files"}/${f.name||"download"}`,ba);
+    });
+    const blob=await zip.generateAsync({type:"blob"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download="allformatsready.zip"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){ showError("ZIP creation failed. Download files individually."); }
+  finally{ btnZip.disabled = false; }
 });
 
 
@@ -524,7 +537,12 @@ initOnboarding();
     mergeFiles.forEach((f, i) => {
       const chip = document.createElement("div");
       chip.className = "tool-chip-ext";
-      chip.innerHTML = `📄 ${f.name.length > 18 ? f.name.slice(0,18)+"…" : f.name} <button class="chip-rm" data-i="${i}">✕</button>`;
+      chip.append(document.createTextNode(`📄 ${f.name.length > 18 ? f.name.slice(0,18)+"…" : f.name} `));
+      const remove = document.createElement("button");
+      remove.className = "chip-rm";
+      remove.dataset.i = String(i);
+      remove.textContent = "✕";
+      chip.appendChild(remove);
       mergeChips.appendChild(chip);
     });
     mergeChips.querySelectorAll(".chip-rm").forEach(btn => {
@@ -548,6 +566,11 @@ initOnboarding();
 
   btnMerge.addEventListener("click", async () => {
     if(mergeFiles.length < 2) return;
+    const totalSize = mergeFiles.reduce((sum, file) => sum + file.size, 0);
+    if(totalSize > 30 * 1024 * 1024){
+      showError("Merge files are too large. Max 30MB total.");
+      return;
+    }
     btnMerge.disabled = true;
     mergeResult.classList.remove("show");
     mergeProg.classList.add("show");
@@ -569,6 +592,7 @@ initOnboarding();
       }
 
       const data = await res.json();
+      if(!data || typeof data.merged_pdf !== "string") throw new Error("Server returned an invalid merge response.");
       mergedB64 = data.merged_pdf;
       mergeFill.style.width = "100%";
       mergeLabel.textContent = "Done!";
@@ -636,6 +660,10 @@ initOnboarding();
       alert(`Format .${ext} not supported. Use PDF, JPG, PNG, WebP, HEIC or DOCX.`);
       return;
     }
+    if(file.size > 10 * 1024 * 1024){
+      alert("File too large. Max 10MB for text extraction.");
+      return;
+    }
     textFile = file;
     btnTextExt.disabled = false;
     btnTextExt.textContent = `Extract from "${file.name.length > 20 ? file.name.slice(0,20)+"…" : file.name}" →`;
@@ -679,6 +707,7 @@ initOnboarding();
       }
 
       const data = await res.json();
+      if(!data || typeof data.full_text !== "string" || typeof data.txt_b64 !== "string") throw new Error("Server returned an invalid text response.");
       txtB64 = data.txt_b64;
       textFillExt.style.width = "100%";
       textLabelExt.textContent = "Done!";

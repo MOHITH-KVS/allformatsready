@@ -301,7 +301,12 @@
       mergeFiles.forEach((f, i) => {
         const chip = document.createElement("div");
         chip.className = "tool-chip";
-        chip.innerHTML = `📄 ${f.name} <button class="tool-chip-remove" data-i="${i}">✕</button>`;
+        chip.append(document.createTextNode(`📄 ${f.name} `));
+        const remove = document.createElement("button");
+        remove.className = "tool-chip-remove";
+        remove.dataset.i = String(i);
+        remove.textContent = "✕";
+        chip.appendChild(remove);
         mergeChips.appendChild(chip);
       });
       mergeChips.querySelectorAll(".tool-chip-remove").forEach(btn => {
@@ -323,6 +328,11 @@
 
     btnMerge.addEventListener("click", async () => {
       if(mergeFiles.length < 2) return;
+      const totalSize = mergeFiles.reduce((sum, file) => sum + file.size, 0);
+      if(totalSize > MERGE_MAX_BYTES){
+        alert("⚠️ Merge files are too large. Maximum total size is 30MB.");
+        return;
+      }
       btnMerge.disabled = true;
       mergeResult.classList.remove("show");
       mergeProgress.classList.add("show");
@@ -337,6 +347,7 @@
         mergeFill.style.width = "90%";
         if(!res.ok){ const e=await res.json(); throw new Error(e.detail||"Merge failed"); }
         const data = await res.json();
+        if(!data || typeof data.merged_pdf !== "string") throw new Error("Server returned an invalid merge response.");
         mergedB64 = data.merged_pdf;
         mergeFill.style.width = "100%";
         mergeLabel.textContent = "Done!";
@@ -386,6 +397,7 @@
 
     function setTextFile(file){
       if(!file.name.toLowerCase().endsWith(".pdf")){ alert("Please upload a PDF file."); return; }
+      if(file.size > CONVERT_MAX_BYTES){ alert("File too large. Maximum size is 10MB."); return; }
       btnExtract.disabled = false;
       btnExtract.textContent = `Extract Text from "${file.name}" →`;
       btnExtract._file = file;
@@ -417,6 +429,7 @@
         textFill.style.width = "95%";
         if(!res.ok){ const e=await res.json(); throw new Error(e.detail||"Extraction failed"); }
         const data = await res.json();
+        if(!data || typeof data.full_text !== "string" || typeof data.txt_b64 !== "string") throw new Error("Server returned an invalid text response.");
         txtB64 = data.txt_b64;
         textFill.style.width = "100%";
         textLabel.textContent = "Done!";
@@ -1051,7 +1064,7 @@
     <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif" multiple/>
     <span class="drop-icon">📂</span>
     <div class="drop-title">Drop your document here or click to browse</div>
-    <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 15MB · Select multiple images at once</div>
+    <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 10MB · Select multiple images at once</div>
     <div class="drop-formats">
       <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
       <span class="drop-fmt">WebP</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">BMP</span>
@@ -1172,7 +1185,7 @@
       <div class="how-step-num">1</div>
       <div class="how-step-content">
         <div class="how-step-title">Upload your document</div>
-        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, JPG, PNG, WebP, HEIC — up to 15MB.</div>
+        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, JPG, PNG, WebP, HEIC — up to 10MB.</div>
         <span class="how-step-tip">💡 Works with Aadhaar, PAN, Passport, certificates, and any image</span>
       </div>
     </div>
@@ -1429,6 +1442,7 @@
 
   // ── State ──
   let selectedFile = null;
+  let selectedFiles = [];
   let allFiles = [];
   let activeCategory = "All";
   let timerInterval = null;
@@ -1462,6 +1476,8 @@
 
   const SENSITIVE_KEYWORDS = ["aadhaar","aadhar","uid","pan","income","passport"];
   const CIRCUMFERENCE = 2 * Math.PI * 11; // r=11
+  const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
+  const MERGE_MAX_BYTES = 30 * 1024 * 1024;
 
   function formatBytes(b){
     if(b<1024) return b+" B";
@@ -1493,13 +1509,14 @@
 
   function setFile(file){
     // Client-side size check
-    if(file.size > 15 * 1024 * 1024){
-      errorWrap.textContent = "⚠️ File too large. Maximum size is 15MB.";
+    if(file.size > CONVERT_MAX_BYTES){
+      errorWrap.textContent = "⚠️ File too large. Maximum size is 10MB.";
       errorWrap.classList.add("show");
       fileInput.value = "";
       return;
     }
     selectedFile = file;
+    selectedFiles = [file];
     fileName.textContent = file.name;
     fileMeta.textContent = formatBytes(file.size) + " · " + file.name.split(".").pop().toUpperCase();
     fileIconWrap.textContent = getFileIcon(file.name);
@@ -1515,8 +1532,38 @@
     multipageNotice.classList.toggle("show", isPDF(file.name));
   }
 
+  function setMultipleFiles(files){
+    const imageFiles = Array.from(files).filter(file => {
+      const ext = file.name.split(".").pop().toLowerCase();
+      return ["jpg","jpeg","png","webp","gif","bmp","tiff","tif","heic","heif"].includes(ext);
+    }).slice(0, 10);
+    const totalSize = imageFiles.reduce((sum, file) => sum + file.size, 0);
+    if(imageFiles.length < 2){
+      errorWrap.textContent = "⚠️ Select at least 2 image files for multi-image conversion.";
+      errorWrap.classList.add("show");
+      return;
+    }
+    if(imageFiles.some(file => file.size > CONVERT_MAX_BYTES) || totalSize > CONVERT_MAX_BYTES){
+      errorWrap.textContent = "⚠️ Multi-image uploads must be 10MB or less in total.";
+      errorWrap.classList.add("show");
+      return;
+    }
+    selectedFiles = imageFiles;
+    selectedFile = imageFiles[0];
+    fileName.textContent = `${imageFiles.length} images selected`;
+    fileMeta.textContent = `${formatBytes(totalSize)} total`;
+    fileIconWrap.textContent = "🖼️";
+    filePreview.classList.add("show");
+    dropZone.style.display = "none";
+    btnConvert.disabled = false;
+    errorWrap.classList.remove("show");
+    resultsSection.style.display = "none";
+    clearPreset();
+    progressWrap.classList.remove("show");
+  }
+
   function reset(){
-    selectedFile = null; allFiles = []; totalPages = 1;
+    selectedFile = null; selectedFiles = []; allFiles = []; totalPages = 1;
     fileInput.value = "";
     filePreview.classList.remove("show");
     sensitiveNotice.classList.remove("show");
@@ -1606,6 +1653,27 @@
     progressFill.style.width = STEPS[Math.min(index, STEPS.length-1)][0] + "%";
   }
 
+  function downloadFile(file){
+    try{
+      const name = file.name || "download";
+      const ext = name.split(".").pop().toLowerCase();
+      const mimeMap = {jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",pdf:"application/pdf",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"};
+      const byteChars = atob(file.data_b64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for(let i=0;i<byteChars.length;i++) byteArr[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArr], {type: mimeMap[ext] || "application/octet-stream"});
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }catch(e){
+      errorWrap.textContent = "⚠️ Download failed. Try again.";
+      errorWrap.classList.add("show");
+    }
+  }
+
   // ── Render cards ──
   function renderCards(category){
     activeCategory = category;
@@ -1616,66 +1684,99 @@
     filtered.forEach(f => {
       const pct = Math.round((f.size_bytes / maxSize) * 100);
       const isMasked = f.label.toLowerCase().includes("masked");
-      const pageTag = f.page ? `<span class="card-page-tag">Page ${f.page}</span>` : "";
       const card = document.createElement("div");
       card.className = "file-card" + (isMasked ? " masked" : "");
       const isImg = ["JPG","PNG","WEBP"].includes(f.format.toUpperCase());
       const isPDF = f.format.toUpperCase() === "PDF";
       const imgSrc = isImg ? `data:image/${f.format.toLowerCase() === "jpg" ? "jpeg" : f.format.toLowerCase()};base64,${f.data_b64}` : "";
 
-      let previewHtml = "";
       if(isImg){
-        previewHtml = `<div class="card-preview" data-src="${imgSrc}">
-          <img src="${imgSrc}" alt="${f.label}" loading="lazy"/>
-          <button class="card-preview-expand" title="View full size">⛶ View</button>
-        </div>`;
+        const preview = document.createElement("div");
+        preview.className = "card-preview";
+        preview.dataset.src = imgSrc;
+        const image = document.createElement("img");
+        image.src = imgSrc;
+        image.alt = f.label || f.name || "Converted image";
+        image.loading = "lazy";
+        const expand = document.createElement("button");
+        expand.className = "card-preview-expand";
+        expand.title = "View full size";
+        expand.textContent = "⛶ View";
+        preview.append(image, expand);
+        card.appendChild(preview);
       } else if(f.format === "DOCX"){
-        previewHtml = `<div class="card-preview-pdf" style="background:linear-gradient(135deg,#DBEAFE,#EFF6FF)">
-          <span class="pdficon">📝</span>
-          <span class="pdflabel" style="color:#1E40AF">Word Document</span>
-        </div>`;
+        const preview = document.createElement("div");
+        preview.className = "card-preview-pdf";
+        preview.style.background = "linear-gradient(135deg,#DBEAFE,#EFF6FF)";
+        const icon = document.createElement("span");
+        icon.className = "pdficon";
+        icon.textContent = "📝";
+        const label = document.createElement("span");
+        label.className = "pdflabel";
+        label.style.color = "#1E40AF";
+        label.textContent = "Word Document";
+        preview.append(icon, label);
+        card.appendChild(preview);
       } else if(isPDF){
-        previewHtml = `<div class="card-preview-pdf">
-          <span class="pdficon">📋</span>
-          <span class="pdflabel">${f.label.includes("Masked") ? "🔐 Masked PDF" : "PDF Document"}</span>
-        </div>`;
+        const preview = document.createElement("div");
+        preview.className = "card-preview-pdf";
+        const icon = document.createElement("span");
+        icon.className = "pdficon";
+        icon.textContent = "📋";
+        const label = document.createElement("span");
+        label.className = "pdflabel";
+        label.textContent = f.label.includes("Masked") ? "🔐 Masked PDF" : "PDF Document";
+        preview.append(icon, label);
+        card.appendChild(preview);
       }
 
-      card.innerHTML = `
-        ${previewHtml}
-        <div class="card-top">
-          <span class="card-fmt-badge ${fmtBadgeClass(f.format)}">${f.format}</span>
-          <span class="card-label">${f.label}</span>
-        </div>
-        ${isMasked ? '<span class="masked-tag">🔐 Masked</span>' : ""}
-        ${pageTag}
-        <div class="card-size-row">
-          <span class="card-size-num">${f.size_kb} KB</span>
-          <div class="size-bar-bg"><div class="size-bar-fill" style="width:${pct}%"></div></div>
-        </div>
-        <a class="btn-dl" href="#" data-name="${f.name}" data-b64="${f.data_b64}">⬇ Download</a>
-      `;
+      const top = document.createElement("div");
+      top.className = "card-top";
+      const format = document.createElement("span");
+      format.className = "card-fmt-badge " + fmtBadgeClass(f.format);
+      format.textContent = f.format || "FILE";
+      const label = document.createElement("span");
+      label.className = "card-label";
+      label.textContent = f.label || f.name || "Converted file";
+      top.append(format, label);
+      card.appendChild(top);
+      if(isMasked){
+        const masked = document.createElement("span");
+        masked.className = "masked-tag";
+        masked.textContent = "🔐 Masked";
+        card.appendChild(masked);
+      }
+      if(f.page){
+        const pageTag = document.createElement("span");
+        pageTag.className = "card-page-tag";
+        pageTag.textContent = `Page ${f.page}`;
+        card.appendChild(pageTag);
+      }
+      const sizeRow = document.createElement("div");
+      sizeRow.className = "card-size-row";
+      const size = document.createElement("span");
+      size.className = "card-size-num";
+      size.textContent = `${f.size_kb || 0} KB`;
+      const barBg = document.createElement("div");
+      barBg.className = "size-bar-bg";
+      const bar = document.createElement("div");
+      bar.className = "size-bar-fill";
+      bar.style.width = `${pct}%`;
+      barBg.appendChild(bar);
+      sizeRow.append(size, barBg);
+      card.appendChild(sizeRow);
+      const download = document.createElement("a");
+      download.className = "btn-dl";
+      download.href = "#";
+      download.textContent = "⬇ Download";
+      download.addEventListener("click", e => {
+        e.preventDefault();
+        downloadFile(f);
+      });
+      card.appendChild(download);
       cardsGrid.appendChild(card);
     });
 
-    cardsGrid.querySelectorAll(".btn-dl").forEach(btn => {
-      btn.addEventListener("click", e => {
-        e.preventDefault();
-        const b64 = btn.dataset.b64;
-        const name = btn.dataset.name;
-        const ext = name.split(".").pop().toLowerCase();
-        const mimeMap = {jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",pdf:"application/pdf",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"};
-        const mime = mimeMap[ext] || "application/octet-stream";
-        const byteChars = atob(b64);
-        const byteArr = new Uint8Array(byteChars.length);
-        for(let i=0;i<byteChars.length;i++) byteArr[i] = byteChars.charCodeAt(i);
-        const blob = new Blob([byteArr], {type: mime});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href=url; a.download=name; a.click();
-        URL.revokeObjectURL(url);
-      });
-    });
 
     // Preview expand buttons → open lightbox
     cardsGrid.querySelectorAll(".card-preview").forEach(prev => {
@@ -1817,7 +1918,10 @@
     const bannerText = document.getElementById("presetBannerText");
     const bannerIcon = document.getElementById("presetBannerIcon");
     bannerIcon.textContent = portal.icon;
-    bannerText.innerHTML = `Showing recommended files for <strong>${portal.name}</strong> — ${portal.req}`;
+    bannerText.replaceChildren(document.createTextNode("Showing recommended files for "));
+    const portalName = document.createElement("strong");
+    portalName.textContent = portal.name;
+    bannerText.append(portalName, document.createTextNode(` — ${portal.req}`));
     banner.classList.add("show");
 
     // Highlight matching cards, dim others
@@ -2014,7 +2118,9 @@
       }
 
       const data = await res.json();
-      allFiles = data.files;
+      if(!data || !Array.isArray(data.files)) throw new Error("Server returned an invalid conversion response.");
+      allFiles = data.files.filter(f => f && typeof f.data_b64 === "string" && typeof f.name === "string");
+      if(allFiles.length === 0) throw new Error("No downloadable files were returned. Please try again.");
       totalPages = data.total_pages || 1;
 
       progressFill.style.width = "100%";
@@ -2063,7 +2169,11 @@
       tab.className = "cat-tab" + (cat === "All" ? " active" : "");
       tab.dataset.cat = cat;
       const count = cat === "All" ? allFiles.length : allFiles.filter(f => f.category === cat).length;
-      tab.innerHTML = cat + ` <span class="cat-count">(${count})</span>`;
+      tab.append(document.createTextNode(`${cat} `));
+      const countEl = document.createElement("span");
+      countEl.className = "cat-count";
+      countEl.textContent = `(${count})`;
+      tab.appendChild(countEl);
       tab.addEventListener("click", () => renderCards(cat));
       catTabs.appendChild(tab);
     });
