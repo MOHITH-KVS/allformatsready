@@ -490,3 +490,88 @@ async def pdf_to_text(request: Request, file: UploadFile = File(...)):
         })
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not extract text: {e}")
+
+
+# ══════════════════════════════════════════════
+# NEW ENDPOINT: Extract text from image (OCR)
+# ══════════════════════════════════════════════
+@app.post("/extract-text")
+@limiter.limit("10/minute")
+async def extract_text(request: Request, file: UploadFile = File(...)):
+    """Extract text from PDF, image, or DOCX."""
+    load_libs()
+
+    filename = file.filename or "document"
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    file_bytes = await file.read()
+
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 10MB.")
+
+    full_text = ""
+    pages_text = []
+    total_pages = 1
+
+    # ── PDF → extract text directly ──
+    if ext == "pdf":
+        try:
+            doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
+            for i, page in enumerate(doc, 1):
+                text = page.get_text().strip()
+                pages_text.append({"page": i, "text": text, "chars": len(text)})
+                full_text += f"\n--- Page {i} ---\n{text}\n"
+            total_pages = len(doc)
+            doc.close()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not read PDF: {e}")
+
+    # ── Image → OCR using PyMuPDF's built-in text layer ──
+    elif ext in ["jpg", "jpeg", "png", "webp", "heic", "heif", "bmp", "tiff"]:
+        try:
+            img = Image_cls.open(io.BytesIO(file_bytes)).convert("RGB")
+            # Convert image to PDF first then extract
+            img_buf = io.BytesIO()
+            img.save(img_buf, format="PDF")
+            img_buf.seek(0)
+            doc = fitz_mod.open(stream=img_buf.getvalue(), filetype="pdf")
+            for i, page in enumerate(doc, 1):
+                # Use OCR via get_text with OCR flag
+                try:
+                    text = page.get_textpage_ocr(flags=0, language="eng", dpi=300).extractText().strip()
+                except:
+                    text = page.get_text().strip()
+                pages_text.append({"page": i, "text": text, "chars": len(text)})
+                full_text += f"\n--- Page {i} ---\n{text}\n"
+            total_pages = len(doc)
+            doc.close()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not process image: {e}")
+
+    # ── DOCX → extract text using python-docx ──
+    elif ext in ["docx", "doc"]:
+        try:
+            from docx import Document as DocxDoc
+            doc = DocxDoc(io.BytesIO(file_bytes))
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            full_text = "\n".join(paragraphs)
+            pages_text = [{"page": 1, "text": full_text, "chars": len(full_text)}]
+            total_pages = 1
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not read DOCX: {e}")
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: .{ext}. Use PDF, JPG, PNG, or DOCX.")
+
+    total_chars = sum(p["chars"] for p in pages_text)
+    txt_bytes = full_text.encode("utf-8")
+    txt_b64 = base64.b64encode(txt_bytes).decode()
+
+    return JSONResponse(content={
+        "pages": pages_text,
+        "total_pages": total_pages,
+        "total_chars": total_chars,
+        "full_text": full_text,
+        "txt_b64": txt_b64,
+        "has_text": total_chars > 20,
+        "format": ext
+    })

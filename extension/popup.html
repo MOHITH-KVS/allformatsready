@@ -522,12 +522,12 @@
 <!-- ═══ TAB 4: PDF TO TEXT ═══ -->
 <div class="tab-panel" id="tab-textex">
   <div class="tool-section">
-    <div style="font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:6px">📝 Extract text from a PDF</div>
+    <div style="font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:6px">📝 Extract text from any document</div>
     <div class="tool-drop-ext" id="textDropExt">
-      <input type="file" id="textInputExt" accept=".pdf"/>
+      <input type="file" id="textInputExt" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.docx"/>
       <span class="tool-drop-icon">📋</span>
-      <div class="tool-drop-text">Drop a PDF here</div>
-      <div class="tool-drop-sub">Single PDF · Max 10MB</div>
+      <div class="tool-drop-text">Drop PDF, Image or DOCX here</div>
+      <div class="tool-drop-sub">PDF · JPG · PNG · DOCX · Max 10MB</div>
     </div>
     <div class="tool-prog-ext" id="textProgExt">
       <div class="tool-prog-bar"><div class="tool-prog-fill" id="textFillExt"></div></div>
@@ -543,11 +543,12 @@
   </div>
 </div>
 
-<!-- ═══ TAB 3: HISTORY ═══ -->
+<!-- ═══ TAB 5: HISTORY ═══ -->
 <div class="tab-panel" id="tab-history">
   <div class="history-section">
+    <div style="font-size:.7rem;color:var(--gray-400);text-align:center;padding:6px 0 8px">Files stored for 24 hours · Auto-deleted after</div>
     <div id="historyList"></div>
-    <button class="btn-clear-history" id="btnClearHistory" style="display:none">🗑 Clear History</button>
+    <button class="btn-clear-history" id="btnClearHistory" style="display:none">🗑 Clear All History</button>
   </div>
 </div>
 

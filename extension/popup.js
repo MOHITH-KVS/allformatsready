@@ -230,8 +230,8 @@ async function doConvert(){
     const data=await res.json();
     allFiles=(data.files||[]).filter(f=>ALLOWED_FORMATS.includes((f.format||"").toUpperCase()));
 
-    // Save to history
-    if(window.ppSaveToHistory) window.ppSaveToHistory(selectedFile.name, allFiles.length);
+    // Save to 24hr history
+    if(window.saveConversionToHistory) window.saveConversionToHistory(selectedFile.name, allFiles);
 
     progressFill.style.width="100%";
     progressLabel.textContent="✅ Done!";
@@ -630,8 +630,10 @@ initOnboarding();
   if(!textDropExt) return;
 
   function setFile(file){
-    if(!file.name.toLowerCase().endsWith(".pdf")){
-      alert("Please upload a PDF file.");
+    const ext = file.name.split(".").pop().toLowerCase();
+    const allowed = ["pdf","jpg","jpeg","png","webp","heic","docx"];
+    if(!allowed.includes(ext)){
+      alert(`Format .${ext} not supported. Use PDF, JPG, PNG, WebP, HEIC or DOCX.`);
       return;
     }
     textFile = file;
@@ -660,7 +662,7 @@ initOnboarding();
     textActionsExt.style.display = "none";
     textProgExt.classList.add("show");
     textFillExt.style.width = "20%";
-    textLabelExt.textContent = "Reading PDF…";
+    textLabelExt.textContent = "Reading document…";
 
     try {
       const fd = new FormData();
@@ -668,7 +670,7 @@ initOnboarding();
       textFillExt.style.width = "60%";
       textLabelExt.textContent = "Extracting text…";
 
-      const res = await fetch(`${API_URL}/pdf-to-text`, { method:"POST", body:fd });
+      const res = await fetch(`${API_URL}/extract-text`, { method:"POST", body:fd });
       textFillExt.style.width = "90%";
 
       if(!res.ok){
