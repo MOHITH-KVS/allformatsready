@@ -13,7 +13,8 @@
   <meta property="og:title" content="AllFormatsReady – Upload Once, Get Every Format"/>
   <meta property="og:description" content="Free Indian document converter. Upload Aadhaar, PAN or any file – get JPG, PNG, WebP, compressed PDF in all sizes instantly."/>
   <meta property="og:type" content="website"/>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AllFormatsReady","description":"Upload your document once and get all formats instantly.","url":"https://allformatsready.vercel.app","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}}
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AllFormatsReady","description":"Upload your document once and get all formats instantly.","url":"https://allformatsready.vercel.app","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}}</script>
+  <script defer>
   // ══════════════════════════════════════════
   // WEBSITE PASSPORT PHOTO TOOL
   // ══════════════════════════════════════════
@@ -271,6 +272,7 @@
   // ══════════════════════════════════════════
   // PDF MERGE TOOL
   // ══════════════════════════════════════════
+  document.addEventListener("DOMContentLoaded", () => {
   (function(){
     let mergeFiles = [];
     let mergedB64 = null;
@@ -519,6 +521,7 @@
     window.startRetryCountdown = startRetryCountdown;
     window.stopRetry = stopRetry;
   })();
+  });
 </script>
 
   <style>
@@ -585,6 +588,7 @@
     /* Sensitive notice */
     .sensitive-notice{display:none;margin:10px 22px 0;padding:11px 14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;font-size:.8rem;color:#92400E;gap:8px;align-items:center}
     .sensitive-notice.show{display:flex}
+    .sensitive-notice.success{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
 
     /* Convert btn */
     .btn-convert{display:block;width:calc(100% - 44px);margin:16px 22px 0;padding:15px;background:var(--brand);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:background .2s,transform .1s,box-shadow .2s;letter-spacing:.2px;box-shadow:0 2px 8px rgba(37,99,235,.25)}
@@ -1020,7 +1024,7 @@
   <div class="header-pills">
     <span class="hpill">📄 PDF</span>
     <span class="hpill">🖼 JPG · PNG · WebP</span>
-    <span class="hpill">🔐 Masked Aadhaar</span>
+    <span class="hpill">🔐 Sensitive-document checks</span>
     <span class="hpill">📦 ZIP</span>
     <a href="#passport-photo" class="hpill" style="text-decoration:none">🪪 Passport Photo</a>
   </div>
@@ -1040,7 +1044,7 @@
     <div class="pill"><strong>EPFO</strong> uploads</div>
     <div class="pill"><strong>Multi-page</strong> PDF support</div>
     <div class="pill">Under <strong>200KB</strong> JPG</div>
-    <div class="pill"><strong>Masked</strong> Aadhaar PDF</div>
+    <div class="pill"><strong>Text-layer</strong> redaction checks</div>
   </div>
 </section>
 
@@ -1067,7 +1071,7 @@
     <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 10MB · Select multiple images at once</div>
     <div class="drop-formats">
       <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
-      <span class="drop-fmt">WebP</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">BMP</span>
+      <span class="drop-fmt">WebP</span><span class="drop-fmt">BMP</span>
       <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span><span class="drop-fmt">HEIC</span>
     </div>
   </div>
@@ -1095,9 +1099,9 @@
     <span id="multiNoticeText"></span>
   </div>
 
-  <div class="sensitive-notice" id="sensitiveNotice">
+  <div class="sensitive-notice" id="sensitiveNotice" role="status" aria-live="polite">
     <span>🔐</span>
-    <div>Aadhaar or PAN detected — a <strong>Masked version</strong> will be generated automatically.</div>
+    <div>Sensitive-document handling is checked after upload. Filenames alone are not used to identify documents.</div>
   </div>
 
   <!-- Page selector (shown after conversion if multi-page) -->
@@ -1114,7 +1118,7 @@
       <div class="progress-step" data-step="0"><div class="step-dot"></div>Reading your document</div>
       <div class="progress-step" data-step="1"><div class="step-dot"></div>Converting to all formats</div>
       <div class="progress-step" data-step="2"><div class="step-dot"></div>Compressing to size targets</div>
-      <div class="progress-step" data-step="3"><div class="step-dot"></div>Generating masked version if needed</div>
+      <div class="progress-step" data-step="3"><div class="step-dot"></div>Checking sensitive-document handling</div>
       <div class="progress-step" data-step="4"><div class="step-dot"></div>Packaging everything</div>
     </div>
     <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
@@ -1129,14 +1133,14 @@
 
   <!-- Privacy row with countdown -->
   <div class="privacy-row">
-    <div class="privacy-text">🔒 <span>Files auto-deleted</span> after processing</div>
+    <div class="privacy-text">🔒 <span>Processed on the server</span>; results remain in this page until you leave or reset it.</div>
     <div class="timer-wrap" id="timerWrap">
       <svg class="timer-ring" viewBox="0 0 28 28">
         <circle class="timer-ring-bg" cx="14" cy="14" r="11"/>
         <circle class="timer-ring-fill" id="timerRingFill" cx="14" cy="14" r="11"/>
       </svg>
       <span class="timer-num" id="timerNum">60s</span>
-      <span style="font-weight:500;font-size:.74rem;color:#15803D">until file deleted</span>
+      <span style="font-weight:500;font-size:.74rem;color:#15803D">browser session</span>
     </div>
   </div>
 </div>
@@ -1162,9 +1166,9 @@
   <div class="privacy-banner">
     <span class="privacy-banner-icon">🔒</span>
     <div class="privacy-banner-text">
-      <strong>Your original file has been deleted from our server.</strong>
-      These converted files exist only in your browser memory — they are never stored on any server.
-      Close this tab and they are gone permanently.
+      <strong>Conversion results are held in this page for download.</strong>
+        The backend processes uploaded files on the server; server retention and deletion are not confirmed by this website.
+        Clear the page when you are finished.
     </div>
   </div>
   <!-- Portal presets INSIDE results -->
@@ -1193,7 +1197,7 @@
       <div class="how-step-num">2</div>
       <div class="how-step-content">
         <div class="how-step-title">Click "Generate All Formats"</div>
-        <div class="how-step-desc">All versions are created simultaneously — PDF compressed, JPG in 3 sizes, PNG lossless, WebP, DOCX. Takes 5-15 seconds.</div>
+            <div class="how-step-desc">All versions are created simultaneously — compressed PDF, JPG size targets, PNG, WebP, and DOCX output. Takes 5-15 seconds.</div>
       </div>
     </div>
     <div class="how-step">
@@ -1227,7 +1231,7 @@
 <section class="tools-section">
   <div class="tools-header">
     <div class="tools-title">🛠️ More Free Tools</div>
-    <div class="tools-sub">PDF merge and text extraction — no sign-up, files deleted instantly</div>
+    <div class="tools-sub">PDF merge and text extraction — no sign-up, processed on the server</div>
   </div>
   <div class="tools-grid">
 
@@ -1407,15 +1411,15 @@
   const FAQS = [
     {icon:"🏦", q:"How to compress Aadhaar PDF under 200KB for bank KYC?", a:"Upload your Aadhaar PDF — you'll see a 'JPG under 200KB' card in the results. Click Download on just that file. No need to download everything else."},
     {icon:"📷", q:"How to convert Aadhaar card PDF to JPG online free?", a:"Upload your Aadhaar PDF above. AllFormatsReady converts it to JPG in multiple sizes automatically — no sign-up, completely free."},
-    {icon:"🔐", q:"What is masked Aadhaar and why do portals ask for it?", a:"Masked Aadhaar hides the first 8 digits of your 12-digit number, showing only the last 4. UIDAI recommends it to protect your identity. We auto-generate it when Aadhaar is detected in your file."},
+    {icon:"🔐", q:"What is masked Aadhaar and why do portals ask for it?", a:"For text-based PDFs, the converter can provide a verified masked output when an Aadhaar identifier is detected. It covers the first 8 digits and preserves only the last 4. Scanned PDFs are not OCR-redacted."},
     {icon:"📄", q:"Can I convert a multi-page PDF? Which pages are converted?", a:"Yes! AllFormatsReady converts every page of your PDF. You'll see separate image cards for each page — Page 1, Page 2, etc. You can download them all as a combined DOCX or individually."},
     {icon:"📸", q:"Does it support HEIC files from iPhone?", a:"Yes! HEIC and HEIF files from iPhone are fully supported. Upload your iPhone photo and get JPG, PNG, WebP, and PDF versions instantly."},
     {icon:"🖼️", q:"Can I upload multiple images at once?", a:"Yes! Select multiple JPG/PNG images at once — you'll get individual formats for each image plus a combined PDF and combined DOCX with all images together."},
     {icon:"🪪", q:"How do I create a passport photo online free?", a:"Use the Passport Photo section on this page. Upload your photo, select your size (Indian Passport 35×45mm, Visa, College, JEE, NEET etc.), adjust the crop, choose background color, and download at 300 DPI quality."},
     {icon:"🧩", q:"What is the Chrome Extension and how is it different?", a:"The Chrome Extension lets you convert documents directly while filling any form — without switching tabs. It auto-detects 30+ Indian portals (EPFO, HDFC, SBI, UIDAI, Naukri etc.) and shows the right format at the top. Download free from GitHub."},
-    {icon:"🛡️", q:"Is my Aadhaar card safe to upload here?", a:"Yes. Your file is processed instantly on our server and permanently deleted within 60 seconds. You can see the live countdown timer after uploading. We never store, read, or share your documents."},
+    {icon:"🛡️", q:"Is my Aadhaar card safe to upload here?", a:"Your file is processed on the server and sensitive-document handling is reported when the text layer can be verified. Scanned-image redaction is not supported. Server retention and deletion depend on the deployment and are not guaranteed by this page."},
     {icon:"📦", q:"Do I need to download everything as a ZIP?", a:"No — that's the point! Each format has its own Download button. If you only need JPG under 200KB, download just that. ZIP is available if you want everything at once."},
-    {icon:"📝", q:"Can I upload a Word document (DOCX)?", a:"DOCX upload is not supported yet — Word files need LibreOffice to render properly which isn't available on free hosting. Instead, export your Word doc as PDF from Microsoft Word, then upload the PDF here."},
+    {icon:"📝", q:"Can I upload a Word document (DOCX)?", a:"The website converter and its PDF-to-text tool accept PDFs and images, not DOCX uploads. Export your Word document as PDF first. DOCX text extraction is available only through the separate backend/extension workflow."},
     {icon:"🆓", q:"Is AllFormatsReady completely free? Any hidden charges?", a:"100% free. No account, no sign-up, no credit card, no watermarks, no hidden charges. We plan to keep the core tool free forever."},
   ];
 
@@ -1474,7 +1478,6 @@
   const timerNum        = document.getElementById("timerNum");
   const timerRingFill   = document.getElementById("timerRingFill");
 
-  const SENSITIVE_KEYWORDS = ["aadhaar","aadhar","uid","pan","income","passport"];
   const CIRCUMFERENCE = 2 * Math.PI * 11; // r=11
   const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
   const MERGE_MAX_BYTES = 30 * 1024 * 1024;
@@ -1494,10 +1497,6 @@
     return "📄";
   }
 
-  function isSensitive(name){
-    return SENSITIVE_KEYWORDS.some(k => name.toLowerCase().includes(k));
-  }
-
   function isPDF(name){
     return name.toLowerCase().endsWith(".pdf");
   }
@@ -1505,6 +1504,24 @@
   function fmtBadgeClass(fmt){
     const m = {JPG:"fmt-jpg",PNG:"fmt-png",WebP:"fmt-webp",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx"};
     return m[fmt] || "fmt-jpg";
+  }
+
+  function updateSensitiveNotice(data){
+    sensitiveNotice.classList.remove("show","success");
+    const files = Array.isArray(data?.files) ? data.files : [];
+    const masked = files.find(file => file && file.format === "PDF" && typeof file.label === "string" && file.label.startsWith("Masked "));
+    const backendNotice = typeof data?.sensitive_notice === "string" ? data.sensitive_notice : "";
+    if(!masked && !backendNotice) return;
+
+    const icon = document.createElement("span");
+    icon.textContent = masked ? "✅" : "⚠️";
+    const message = document.createElement("div");
+    message.textContent = masked
+      ? `${masked.label} is available. This verifies the PDF text layer only; scanned images and other representations are not covered.`
+      : backendNotice;
+    sensitiveNotice.replaceChildren(icon, message);
+    sensitiveNotice.classList.add("show");
+    if(masked) sensitiveNotice.classList.add("success");
   }
 
   function setFile(file){
@@ -1528,7 +1545,7 @@
     clearPreset();
     progressWrap.classList.remove("show");
     pageSelector.classList.remove("show");
-    sensitiveNotice.classList.toggle("show", isSensitive(file.name));
+    sensitiveNotice.classList.remove("show","success");
     multipageNotice.classList.toggle("show", isPDF(file.name));
   }
 
@@ -1566,7 +1583,7 @@
     selectedFile = null; selectedFiles = []; allFiles = []; totalPages = 1;
     fileInput.value = "";
     filePreview.classList.remove("show");
-    sensitiveNotice.classList.remove("show");
+    sensitiveNotice.classList.remove("show","success");
     multipageNotice.classList.remove("show");
     pageSelector.classList.remove("show");
     dropZone.style.display = "";
@@ -1640,7 +1657,7 @@
     [15,"Reading your document"],
     [35,"Converting to all formats"],
     [60,"Compressing to size targets"],
-    [80,"Generating masked version if needed"],
+    [80,"Checking sensitive-document handling"],
     [95,"Packaging everything"],
   ];
 
@@ -1809,12 +1826,20 @@
   fetch(API_URL + "/ping").catch(() => {});
 
   // ── Portal Presets ──
+  function isJpgUnder(file, kb){
+    return file.format === "JPG" && file.label.includes(`Under ${kb}KB`) && file.size_bytes <= kb * 1024;
+  }
+
+  function isPdfUnder(file, mb){
+    return file.format === "PDF" && Number.isFinite(file.size_bytes) && file.size_bytes <= mb * 1024 * 1024;
+  }
+
   const PORTALS = [
     {
       id:"epfo", icon:"🏢", name:"EPFO Upload",
       desc:"Employee Provident Fund",
-      req:"PDF or JPG · Max 500KB",
-      match: f => (f.format==="PDF" && !f.label.includes("Masked")) || (f.format==="JPG" && f.label.includes("500"))
+      req:"PDF or JPG · 500KB target",
+      match: f => isPdfUnder(f, 0.5) || isJpgUnder(f, 500)
     },
     {
       id:"uidai", icon:"🪪", name:"UIDAI / Aadhaar",
@@ -1825,32 +1850,32 @@
     {
       id:"bankkyc", icon:"🏦", name:"Bank KYC",
       desc:"Account opening & KYC",
-      req:"JPG under 200KB",
-      match: f => f.format==="JPG" && f.label.includes("200")
+      req:"JPG under 200KB target",
+      match: f => isJpgUnder(f, 200)
     },
     {
       id:"passport", icon:"✈️", name:"Passport Seva",
       desc:"Passport application",
-      req:"JPG under 1MB · PDF",
-      match: f => (f.format==="JPG" && f.label.includes("1024")) || f.format==="PDF"
+      req:"JPG under 500KB target · PDF",
+      match: f => isJpgUnder(f, 500) || isPdfUnder(f, 2)
     },
     {
       id:"college", icon:"🎓", name:"College Admission",
       desc:"University form upload",
-      req:"JPG or PDF · Max 500KB",
-      match: f => (f.format==="JPG" && f.label.includes("500")) || (f.format==="PDF" && !f.label.includes("Masked"))
+      req:"JPG or PDF · 500KB target",
+      match: f => isJpgUnder(f, 500) || isPdfUnder(f, 0.5)
     },
     {
       id:"incometax", icon:"📊", name:"Income Tax Portal",
       desc:"ITR & e-filing",
-      req:"PDF compressed · Max 1MB",
-      match: f => f.format==="PDF"
+      req:"Compressed PDF · 1MB target",
+      match: f => isPdfUnder(f, 1)
     },
     {
       id:"naukri", icon:"💼", name:"Naukri / LinkedIn",
       desc:"Job portal document upload",
-      req:"PDF · Max 2MB",
-      match: f => f.format==="PDF" && !f.label.includes("Masked")
+      req:"PDF · 2MB target",
+      match: f => isPdfUnder(f, 2) && !f.label.includes("Masked")
     },
     {
       id:"digilocker", icon:"📱", name:"DigiLocker",
@@ -1861,26 +1886,26 @@
     {
       id:"driving", icon:"🚗", name:"Driving Licence",
       desc:"Parivahan / RTO portal",
-      req:"JPG under 100KB",
-      match: f => f.format==="JPG" && f.label.includes("100")
+      req:"JPG under 100KB target",
+      match: f => isJpgUnder(f, 100)
     },
     {
       id:"cowin", icon:"💉", name:"NHA / Health Portal",
       desc:"Ayushman Bharat & CoWIN",
-      req:"JPG under 200KB · PDF",
-      match: f => (f.format==="JPG" && f.label.includes("200")) || f.format==="PDF"
+      req:"JPG under 200KB target · PDF",
+      match: f => isJpgUnder(f, 200) || f.format === "PDF"
     },
     {
       id:"gstn", icon:"🧾", name:"GST Portal",
       desc:"GST registration & filing",
-      req:"PDF or JPG · Max 1MB",
-      match: f => f.format==="PDF" || (f.format==="JPG" && f.label.includes("1024"))
+      req:"PDF or JPG · 500KB target",
+      match: f => isPdfUnder(f, 1) || isJpgUnder(f, 500)
     },
     {
       id:"scholarship", icon:"📝", name:"Scholarship Portal",
       desc:"NSP / State scholarship",
-      req:"JPG under 200KB · PDF",
-      match: f => (f.format==="JPG" && f.label.includes("200")) || (f.format==="PDF" && !f.label.includes("Masked"))
+      req:"JPG under 200KB target · PDF",
+      match: f => isJpgUnder(f, 200) || (f.format === "PDF" && !f.label.includes("Masked"))
     },
   ];
 
@@ -1967,12 +1992,12 @@
       "✅ PDF compressed\n" +
       "✅ JPG under 100KB, 200KB, 500KB\n" +
       "✅ PNG, WebP, DOCX\n" +
-      "✅ Masked Aadhaar PDF (auto-generated)\n" +
+      "✅ Text-layer sensitive-document checks\n" +
       "✅ Works for EPFO, Bank KYC, UIDAI, Passport, Income Tax\n\n" +
       "🧩 *Chrome Extension available* — converts while you fill forms, no tab switching!\n\n" +
       "👉 Try FREE: https://allformatsready.vercel.app\n\n" +
       "🧩 Download Chrome Extension: https://github.com/MOHITH-KVS/allformatsready/releases\n\n" +
-      "No sign-up. No watermark. Files deleted in 60 seconds. 🔒"
+      "No sign-up. No watermark. Processed on the server; clear the page when finished. 🔒"
     );
     const btn = document.getElementById("btnWhatsApp");
     if(btn) btn.href = `https://wa.me/?text=${text}`;
@@ -2105,7 +2130,7 @@
         if(fileToSend !== selectedFile){
           const origMB = (selectedFile.size/1024/1024).toFixed(1);
           const newMB  = (fileToSend.size/1024/1024).toFixed(1);
-          progressLabel && (progressLabel.textContent = `Optimised ${origMB}MB → ${newMB}MB…`);
+          setStep(0);
         }
         formData.append("file", fileToSend);
         res = await fetch(`${API_URL}/convert`, { method:"POST", body:formData });
@@ -2122,12 +2147,10 @@
       allFiles = data.files.filter(f => f && typeof f.data_b64 === "string" && typeof f.name === "string");
       if(allFiles.length === 0) throw new Error("No downloadable files were returned. Please try again.");
       totalPages = data.total_pages || 1;
+      updateSensitiveNotice(data);
 
       progressFill.style.width = "100%";
       setStep(STEPS.length);
-
-      // Start 60s countdown
-      startTimer(60);
 
       setTimeout(() => {
         progressWrap.classList.remove("show");
@@ -2192,14 +2215,14 @@
 </div>
 
 <!-- Floating countdown timer (fixed bottom-right) -->
-<div class="floating-timer" id="floatingTimer">
+<div class="floating-timer" id="floatingTimer" aria-hidden="true">
   <svg class="ft-ring" viewBox="0 0 38 38">
     <circle class="ft-ring-bg" cx="19" cy="19" r="17"/>
     <circle class="ft-ring-fill" id="ftRingFill" cx="19" cy="19" r="17"/>
   </svg>
   <div class="ft-text">
     <span class="ft-num" id="ftNum">60s</span>
-    <span class="ft-label">🔒 Original file<br>auto-deleted</span>
+    <span class="ft-label">🔒 Browser session<br>timer</span>
   </div>
 </div>
 

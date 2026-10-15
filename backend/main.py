@@ -524,7 +524,7 @@ async def convert(request: Request, file: UploadFile = File(...)):
                     except Exception as exc:
                         logger.exception("Sensitive-document redaction failed")
                         raise HTTPException(status_code=422, detail="Sensitive identifiers were detected, but redaction could not be verified.") from exc
-                    type_label = " and ".join(sorted(matched_types).title())
+                    type_label = " and ".join(identifier_type.title() for identifier_type in sorted(matched_types))
                     type_slug = "_".join(sorted(matched_types))
                     policy = "Aadhaar preserves only the last four digits; PAN is fully covered."
                     outputs.append(make_file(
