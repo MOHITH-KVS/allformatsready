@@ -277,7 +277,7 @@ def matched_character_indexes(match, char_boxes):
     ]
 
 
-def redaction_rects_for_match(match_type, match_indexes):
+def redaction_rects_for_match(match_type, match, match_indexes):
     if not match_indexes:
         return []
     preserve_positions = set()
@@ -306,7 +306,7 @@ def redact_sensitive_pdf(pdf_bytes, expected_types):
                 page_matches.append(("pan", match))
             for match_type, match in page_matches:
                 indexes = matched_character_indexes(match, char_boxes)
-                rects = redaction_rects_for_match(match_type, indexes)
+                rects = redaction_rects_for_match(match_type, match, indexes)
                 if not rects:
                     raise RuntimeError("Sensitive text could not be mapped to PDF geometry")
                 matched_types.add(match_type)

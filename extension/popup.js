@@ -103,7 +103,7 @@ async function detectCurrentPortal(){
       portalBanner.classList.add("general");
     }else{
       portalName.textContent="✅ "+portal.name;
-      portalReq.textContent=portal.req;
+      portalReq.textContent="Suggestion: "+portal.req;
     }
   }catch(e){}
 }
@@ -334,7 +334,9 @@ function renderCards(){
   if(others.length>0){
     const lbl2=document.createElement("div");
     lbl2.className="section-label";
-    lbl2.textContent=recommended.length>0?"Other formats":"All formats";
+    lbl2.textContent=recommended.length>0
+      ? "Other formats"
+      : (activePortal&&activePortal.id!=="general" ? "No generated file meets this suggestion" : "All formats");
     cardsList.appendChild(lbl2);
     others.forEach(f=>cardsList.appendChild(buildCard(f,false)));
   }
