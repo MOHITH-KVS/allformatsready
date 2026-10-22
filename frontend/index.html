@@ -15,6 +15,20 @@
   <meta property="og:type" content="website"/>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AllFormatsReady","description":"Upload your document once and get all formats instantly.","url":"https://allformatsready.vercel.app","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}}</script>
   <script defer>
+  const API_URL = "https://allformatsready.onrender.com";
+  const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
+  const MERGE_MAX_BYTES = 30 * 1024 * 1024;
+
+  function apiErrorMessage(payload, fallback){
+    const detail = payload && payload.detail;
+    if(typeof detail === "string" && detail.trim()) return detail;
+    if(Array.isArray(detail)){
+      const first = detail.find(item => item && (item.msg || item.message));
+      if(first) return first.msg || first.message;
+    }
+    return fallback;
+  }
+
   // ══════════════════════════════════════════
   // WEBSITE PASSPORT PHOTO TOOL
   // ══════════════════════════════════════════
@@ -114,9 +128,16 @@
     }
 
     function loadImg(file){
+      const ext = (file.name || "").split(".").pop().toLowerCase();
+      if(["heic","heif"].includes(ext)){
+        alert("HEIC/HEIF photos cannot be decoded in the browser photo tool. Convert the photo to JPG or PNG first, then upload.");
+        return;
+      }
       const reader = new FileReader();
+      reader.onerror = () => alert("Could not read this image. Use JPG, PNG or WebP.");
       reader.onload = e => {
         const img = new Image();
+        img.onerror = () => alert("Could not read this image. Use JPG, PNG or WebP.");
         img.onload = () => {
           ppImg = img;
           ppZoom = 1.0;
@@ -347,7 +368,10 @@
         mergeFill.style.width = "60%";
         const res = await fetch(`${API_URL}/merge-pdf`, { method:"POST", body:fd });
         mergeFill.style.width = "90%";
-        if(!res.ok){ const e=await res.json(); throw new Error(e.detail||"Merge failed"); }
+        if(!res.ok){
+          const e=await res.json().catch(()=>({}));
+          throw new Error(apiErrorMessage(e, "Merge failed"));
+        }
         const data = await res.json();
         if(!data || typeof data.merged_pdf !== "string") throw new Error("Server returned an invalid merge response.");
         mergedB64 = data.merged_pdf;
@@ -429,7 +453,10 @@
         textFill.style.width = "70%";
         const res = await fetch(`${API_URL}/pdf-to-text`, {method:"POST", body:fd});
         textFill.style.width = "95%";
-        if(!res.ok){ const e=await res.json(); throw new Error(e.detail||"Extraction failed"); }
+        if(!res.ok){
+          const e=await res.json().catch(()=>({}));
+          throw new Error(apiErrorMessage(e, "Extraction failed"));
+        }
         const data = await res.json();
         if(!data || typeof data.full_text !== "string" || typeof data.txt_b64 !== "string") throw new Error("Server returned an invalid text response.");
         txtB64 = data.txt_b64;
@@ -490,18 +517,24 @@
     const btnRetryNow = document.getElementById("btnRetryNow");
 
     function startRetryCountdown(onRetry){
+      stopRetry();
+      if(!retryBanner || !retryText) return;
       let secs = 30;
+      let ran = false;
+      const fire = () => {
+        if(ran) return;
+        ran = true;
+        stopRetry();
+        onRetry();
+      };
       retryBanner.classList.add("show");
       retryText.textContent = `Server waking up — auto-retrying in ${secs}s`;
       retryTimer = setInterval(() => {
         secs--;
         retryText.textContent = `Server waking up — auto-retrying in ${secs}s`;
-        if(secs <= 0){
-          stopRetry();
-          onRetry();
-        }
+        if(secs <= 0) fire();
       }, 1000);
-      btnRetryNow.onclick = () => { stopRetry(); onRetry(); };
+      if(btnRetryNow) btnRetryNow.onclick = fire;
     }
 
     function stopRetry(){
@@ -509,11 +542,8 @@
       retryBanner.classList.remove("show");
     }
 
-    // Patch the existing btnConvert click to add auto-retry
-    const origConvert = btnConvert.onclick;
     const convertBtn = document.getElementById("btnConvert");
     if(convertBtn){
-      const origHandler = convertBtn.onclick;
       convertBtn.addEventListener("click", () => stopRetry());
     }
 
@@ -1451,6 +1481,9 @@
   let activeCategory = "All";
   let timerInterval = null;
   let totalPages = 1;
+  let convertInFlight = false;
+  const CONVERT_EXTS = ["pdf","jpg","jpeg","png","webp","gif","bmp","tiff","tif","heic","heif"];
+  const CONVERT_TIMEOUT_MS = 120000;
 
   // ── Elements ──
   const dropZone        = document.getElementById("dropZone");
@@ -1506,6 +1539,33 @@
     return m[fmt] || "fmt-jpg";
   }
 
+  function apiErrorMessage(payload, fallback){
+    const detail = payload && payload.detail;
+    if(typeof detail === "string" && detail.trim()) return detail;
+    if(Array.isArray(detail)){
+      const first = detail.find(item => item && (item.msg || item.message));
+      if(first) return first.msg || first.message;
+    }
+    return fallback;
+  }
+
+  function isRetryableNetworkError(err){
+    if(!err) return false;
+    const msg = String(err.message || "");
+    return err.name === "TypeError" && /failed to fetch|networkerror|load failed|network request failed/i.test(msg);
+  }
+
+  function rejectSelection(message){
+    selectedFile = null;
+    selectedFiles = [];
+    fileInput.value = "";
+    filePreview.classList.remove("show");
+    dropZone.style.display = "";
+    btnConvert.disabled = true;
+    errorWrap.textContent = "⚠️ " + message;
+    errorWrap.classList.add("show");
+  }
+
   function updateSensitiveNotice(data){
     sensitiveNotice.classList.remove("show","success");
     const files = Array.isArray(data?.files) ? data.files : [];
@@ -1525,11 +1585,18 @@
   }
 
   function setFile(file){
-    // Client-side size check
+    if(!file) return;
+    const ext = (file.name || "").split(".").pop().toLowerCase();
+    if(!file.size){
+      rejectSelection("The selected file is empty.");
+      return;
+    }
     if(file.size > CONVERT_MAX_BYTES){
-      errorWrap.textContent = "⚠️ File too large. Maximum size is 10MB.";
-      errorWrap.classList.add("show");
-      fileInput.value = "";
+      rejectSelection("File too large. Maximum size is 10MB.");
+      return;
+    }
+    if(!CONVERT_EXTS.includes(ext)){
+      rejectSelection(`Format .${ext} not supported. Use PDF, JPG, PNG, WebP, HEIC, GIF, BMP or TIFF.`);
       return;
     }
     selectedFile = file;
@@ -1556,13 +1623,11 @@
     }).slice(0, 10);
     const totalSize = imageFiles.reduce((sum, file) => sum + file.size, 0);
     if(imageFiles.length < 2){
-      errorWrap.textContent = "⚠️ Select at least 2 image files for multi-image conversion.";
-      errorWrap.classList.add("show");
+      rejectSelection("Select at least 2 image files for multi-image conversion. PDFs must be uploaded one at a time.");
       return;
     }
-    if(imageFiles.some(file => file.size > CONVERT_MAX_BYTES) || totalSize > CONVERT_MAX_BYTES){
-      errorWrap.textContent = "⚠️ Multi-image uploads must be 10MB or less in total.";
-      errorWrap.classList.add("show");
+    if(imageFiles.some(file => !file.size || file.size > CONVERT_MAX_BYTES) || totalSize > CONVERT_MAX_BYTES){
+      rejectSelection("Multi-image uploads must be 10MB or less in total, and each file must be non-empty.");
       return;
     }
     selectedFiles = imageFiles;
@@ -1580,6 +1645,7 @@
   }
 
   function reset(){
+    if(window.stopRetry) window.stopRetry();
     selectedFile = null; selectedFiles = []; allFiles = []; totalPages = 1;
     fileInput.value = "";
     filePreview.classList.remove("show");
@@ -2006,24 +2072,36 @@
 
   // ── ZIP download ──
   btnZip.addEventListener("click", async () => {
-    if(!window.JSZip){
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-      document.head.appendChild(script);
-      await new Promise(res => script.onload = res);
+    btnZip.disabled = true;
+    try {
+      if(!window.JSZip){
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+          script.onload = resolve;
+          script.onerror = () => reject(new Error("ZIP library failed to load"));
+          document.head.appendChild(script);
+        });
+      }
+      if(typeof window.JSZip !== "function") throw new Error("ZIP library failed to load");
+      const zip = new window.JSZip();
+      allFiles.forEach(f => {
+        const byteChars = atob(f.data_b64);
+        const byteArr = new Uint8Array(byteChars.length);
+        for(let i=0;i<byteChars.length;i++) byteArr[i] = byteChars.charCodeAt(i);
+        zip.file(`allformatsready/${f.category || "files"}/${f.name || "download"}`, byteArr);
+      });
+      const blob = await zip.generateAsync({type:"blob"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href=url; a.download="allformatsready.zip"; a.click();
+      URL.revokeObjectURL(url);
+    } catch(e){
+      errorWrap.textContent = "⚠️ ZIP creation failed. Download files individually.";
+      errorWrap.classList.add("show");
+    } finally {
+      btnZip.disabled = false;
     }
-    const zip = new JSZip();
-    allFiles.forEach(f => {
-      const byteChars = atob(f.data_b64);
-      const byteArr = new Uint8Array(byteChars.length);
-      for(let i=0;i<byteChars.length;i++) byteArr[i] = byteChars.charCodeAt(i);
-      zip.file(`allformatsready/${f.category}/${f.name}`, byteArr);
-    });
-    const blob = await zip.generateAsync({type:"blob"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href=url; a.download="allformatsready.zip"; a.click();
-    URL.revokeObjectURL(url);
   });
 
 
@@ -2033,63 +2111,65 @@
   const MAX_DIMENSION     = 2400; // preserve high resolution — only scale if extreme
 
   async function compressIfNeeded(file) {
-    // PDFs — cannot compress in browser, send as-is
-    const ext = file.name.split(".").pop().toLowerCase();
-    if(ext === "pdf") return file;
+    const ext = (file.name || "").split(".").pop().toLowerCase();
+    if(ext === "pdf" || file.size <= COMPRESS_THRESHOLD) return file;
+    // HEIC/HEIF/TIFF are not reliably decoded by canvas; send original bytes.
+    if(!["jpg","jpeg","png","webp","gif","bmp"].includes(ext)) return file;
 
-    // Small files — send exactly as-is, zero quality loss
-    if(file.size <= COMPRESS_THRESHOLD) return file;
-
-    // Large image — use binary search to find MINIMUM quality loss
-    // that still gets file under target size (same as SmallPDF / Adobe approach)
     return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => {
+        if(settled) return;
+        settled = true;
+        clearTimeout(watchdog);
+        resolve(result || file);
+      };
+      const watchdog = setTimeout(() => finish(file), 15000);
       const reader = new FileReader();
+      reader.onerror = () => finish(file);
       reader.onload = (e) => {
         const img = new window.Image();
+        img.onerror = () => finish(file);
         img.onload = async () => {
-          // Only resize if image is extremely large (over 2400px)
-          // Preserves quality for normal high-res documents
-          let w = img.width, h = img.height;
-          if(w > MAX_DIMENSION || h > MAX_DIMENSION){
-            if(w > h){ h = Math.round(h * MAX_DIMENSION / w); w = MAX_DIMENSION; }
-            else { w = Math.round(w * MAX_DIMENSION / h); h = MAX_DIMENSION; }
-          }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-
-          // Binary search for minimum quality loss
-          // Start high (0.96) and only go lower if needed
-          let lo = 0.50, hi = 0.96, bestBlob = null;
-          for(let i = 0; i < 8; i++){
-            const mid = (lo + hi) / 2;
-            const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", mid));
-            if(blob.size <= TARGET_SIZE){
-              bestBlob = blob; // this quality fits — try higher
-              lo = mid;
-            } else {
-              hi = mid; // too big — try lower quality
+          try {
+            let w = img.width, h = img.height;
+            if(!w || !h){ finish(file); return; }
+            if(w > MAX_DIMENSION || h > MAX_DIMENSION){
+              if(w > h){ h = Math.round(h * MAX_DIMENSION / w); w = MAX_DIMENSION; }
+              else { w = Math.round(w * MAX_DIMENSION / h); h = MAX_DIMENSION; }
             }
+
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            if(!ctx){ finish(file); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+
+            let lo = 0.50, hi = 0.96, bestBlob = null;
+            for(let i = 0; i < 8; i++){
+              const mid = (lo + hi) / 2;
+              const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", mid));
+              if(blob && blob.size <= TARGET_SIZE){
+                bestBlob = blob;
+                lo = mid;
+              } else {
+                hi = mid;
+              }
+            }
+
+            if(!bestBlob){
+              bestBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.50));
+            }
+            if(!bestBlob){ finish(file); return; }
+
+            finish(new File(
+              [bestBlob],
+              file.name.replace(/\.[^/.]+$/, ".jpg"),
+              { type: "image/jpeg" }
+            ));
+          } catch(e){
+            finish(file);
           }
-
-          // If even lowest quality is too big, use it anyway (backend handles it)
-          if(!bestBlob){
-            bestBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.50));
-          }
-
-          const finalQuality = Math.round(lo * 100);
-          const origMB = (file.size / 1024 / 1024).toFixed(1);
-          const newMB  = (bestBlob.size / 1024 / 1024).toFixed(1);
-          console.log(`Smart compress: ${origMB}MB → ${newMB}MB at ${finalQuality}% quality (minimum loss)`);
-
-          const compressed = new File(
-            [bestBlob],
-            file.name.replace(/\.[^/.]+$/, ".jpg"),
-            { type: "image/jpeg" }
-          );
-          resolve(compressed);
         };
         img.src = e.target.result;
       };
@@ -2099,7 +2179,9 @@
 
   // ── Convert ──
   btnConvert.addEventListener("click", async () => {
-    if(!selectedFile) return;
+    if(!selectedFile || convertInFlight) return;
+    convertInFlight = true;
+    if(window.stopRetry) window.stopRetry();
     errorWrap.classList.remove("show");
     btnConvert.disabled = true;
     progressWrap.classList.add("show");
@@ -2112,39 +2194,35 @@
       si++;
       if(si < STEPS.length) setStep(si);
     }, 1200);
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), CONVERT_TIMEOUT_MS);
 
     try {
       let res;
       const formData = new FormData();
 
       if(selectedFiles.length > 1){
-        // Multiple images → use /convert-multiple
         for(const f of selectedFiles){
           const compressed = await compressIfNeeded(f);
           formData.append("files", compressed);
         }
-        res = await fetch(`${API_URL}/convert-multiple`, { method:"POST", body:formData });
+        res = await fetch(`${API_URL}/convert-multiple`, { method:"POST", body:formData, signal: controller.signal });
       } else {
-        // Single file → use /convert
         const fileToSend = await compressIfNeeded(selectedFile);
-        if(fileToSend !== selectedFile){
-          const origMB = (selectedFile.size/1024/1024).toFixed(1);
-          const newMB  = (fileToSend.size/1024/1024).toFixed(1);
-          setStep(0);
-        }
         formData.append("file", fileToSend);
-        res = await fetch(`${API_URL}/convert`, { method:"POST", body:formData });
+        res = await fetch(`${API_URL}/convert`, { method:"POST", body:formData, signal: controller.signal });
       }
-      clearInterval(timer);
 
       if(!res.ok){
-        const err = await res.json().catch(() => ({detail:"Server error"}));
-        throw new Error(err.detail || "Conversion failed");
+        const err = await res.json().catch(() => ({}));
+        const httpErr = new Error(apiErrorMessage(err, res.status >= 500 ? "Server error. Please try again." : "Conversion failed"));
+        httpErr.status = res.status;
+        throw httpErr;
       }
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if(!data || !Array.isArray(data.files)) throw new Error("Server returned an invalid conversion response.");
-      allFiles = data.files.filter(f => f && typeof f.data_b64 === "string" && typeof f.name === "string");
+      allFiles = data.files.filter(f => f && typeof f.data_b64 === "string" && f.data_b64.length > 0 && typeof f.name === "string");
       if(allFiles.length === 0) throw new Error("No downloadable files were returned. Please try again.");
       totalPages = data.total_pages || 1;
       updateSensitiveNotice(data);
@@ -2159,24 +2237,30 @@
       }, 500);
 
     } catch(err){
-      clearInterval(timer);
       progressWrap.classList.remove("show");
       btnConvert.disabled = false;
-      const msg = err.message || "";
-      if(msg.includes("fetch") || msg.includes("network") || msg.includes("Failed")){
-        errorWrap.textContent = "⚠️ Server is waking up. See countdown below.";
+      const timedOut = err && err.name === "AbortError";
+      const msg = timedOut
+        ? "The conversion timed out. The server may be busy — please try again."
+        : (err.message || "Something went wrong. Please try again.");
+      if(isRetryableNetworkError(err)){
+        errorWrap.textContent = "⚠️ Server is unavailable. See countdown below.";
         errorWrap.classList.add("show");
         if(window.startRetryCountdown){
           window.startRetryCountdown(() => {
             errorWrap.classList.remove("show");
-            btnConvert.click();
+            if(!convertInFlight) btnConvert.click();
           });
         }
       } else {
-        errorWrap.textContent = "⚠️ " + (msg || "Something went wrong. Please try again.");
+        errorWrap.textContent = "⚠️ " + msg;
         errorWrap.classList.add("show");
       }
       stopTimer();
+    } finally {
+      clearInterval(timer);
+      clearTimeout(abortTimer);
+      convertInFlight = false;
     }
   });
 

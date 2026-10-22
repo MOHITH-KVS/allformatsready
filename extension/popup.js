@@ -1,5 +1,7 @@
 const API_URL = "https://allformatsready.onrender.com";
 const ALLOWED_FORMATS = ["JPG","PNG","WEBP","PDF","DOCX"];
+const CONVERT_TIMEOUT_MS = 120000;
+const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
 
 let selectedFile = null;
 let allFiles = [];
@@ -7,6 +9,7 @@ let activePortal = null;
 let activeFilter = "ALL";
 let convertStartTime = 0;
 let retryTimer = null;
+let convertInFlight = false;
 
 const portalBanner  = document.getElementById("portalBanner");
 const portalIcon    = document.getElementById("portalIcon");
@@ -51,6 +54,20 @@ function getFileIcon(name){
 function fmtClass(fmt){
   const m={JPG:"fmt-jpg",PNG:"fmt-png",WEBP:"fmt-webp",PDF:"fmt-pdf",DOCX:"fmt-docx"};
   return m[(fmt||"").toUpperCase()]||"fmt-jpg";
+}
+function apiErrorMessage(payload, fallback){
+  const detail = payload && payload.detail;
+  if(typeof detail === "string" && detail.trim()) return detail;
+  if(Array.isArray(detail)){
+    const first = detail.find(item => item && (item.msg || item.message));
+    if(first) return first.msg || first.message;
+  }
+  return fallback;
+}
+function isRetryableNetworkError(err){
+  if(!err) return false;
+  const msg = String(err.message || "");
+  return err.name === "TypeError" && /failed to fetch|networkerror|load failed|network request failed/i.test(msg);
 }
 function showError(msg, showRetry=false){
   errorWrap.replaceChildren(document.createTextNode("⚠️ " + msg));
@@ -111,10 +128,32 @@ async function detectCurrentPortal(){
 // ── File handling ──
 function setFile(file){
   if(!file) return;
-  if(file.size>10*1024*1024){ showError("File too large. Max 10MB for conversion."); return; }
+  if(!file.size){
+    selectedFile=null;
+    fileInput.value="";
+    filePreview.classList.remove("show");
+    dropZone.style.display="";
+    btnConvert.disabled=true;
+    showError("The selected file is empty.");
+    return;
+  }
+  if(file.size>CONVERT_MAX_BYTES){
+    selectedFile=null;
+    fileInput.value="";
+    filePreview.classList.remove("show");
+    dropZone.style.display="";
+    btnConvert.disabled=true;
+    showError("File too large. Max 10MB for conversion.");
+    return;
+  }
   const ext=file.name.split(".").pop().toLowerCase();
   const allowed=["pdf","jpg","jpeg","png","webp","heic","heif"];
   if(!allowed.includes(ext)){
+    selectedFile=null;
+    fileInput.value="";
+    filePreview.classList.remove("show");
+    dropZone.style.display="";
+    btnConvert.disabled=true;
     showError(`Format .${ext} not supported. Use PDF, JPG, PNG, WebP or HEIC.`);
     return;
   }
@@ -129,6 +168,7 @@ function setFile(file){
 }
 
 function reset(){
+  hideError();
   selectedFile=null; allFiles=[];
   fileInput.value="";
   filePreview.classList.remove("show");
@@ -165,27 +205,46 @@ document.addEventListener("keydown", e => {
 async function compressIfNeeded(file){
   const ext=(file.name||"").split(".").pop().toLowerCase();
   if(ext==="pdf"||file.size<=2*1024*1024) return file;
+  if(!["jpg","jpeg","png","webp","gif","bmp"].includes(ext)) return file;
   return new Promise(resolve=>{
+    let settled=false;
+    const finish=result=>{
+      if(settled) return;
+      settled=true;
+      clearTimeout(watchdog);
+      resolve(result||file);
+    };
+    const watchdog=setTimeout(()=>finish(file),15000);
     const reader=new FileReader();
+    reader.onerror=()=>finish(file);
     reader.onload=e=>{
       const img=new Image();
+      img.onerror=()=>finish(file);
       img.onload=async()=>{
-        let w=img.width,h=img.height;
-        if(w>2400||h>2400){
-          if(w>h){h=Math.round(h*2400/w);w=2400;}
-          else{w=Math.round(w*2400/h);h=2400;}
+        try{
+          let w=img.width,h=img.height;
+          if(!w||!h){ finish(file); return; }
+          if(w>2400||h>2400){
+            if(w>h){h=Math.round(h*2400/w);w=2400;}
+            else{w=Math.round(w*2400/h);h=2400;}
+          }
+          const canvas=document.createElement("canvas");
+          canvas.width=w; canvas.height=h;
+          const ctx=canvas.getContext("2d");
+          if(!ctx){ finish(file); return; }
+          ctx.drawImage(img,0,0,w,h);
+          let lo=0.5,hi=0.96,best=null;
+          for(let i=0;i<8;i++){
+            const mid=(lo+hi)/2;
+            const blob=await new Promise(r=>canvas.toBlob(r,"image/jpeg",mid));
+            if(blob && blob.size<=1.8*1024*1024){best=blob;lo=mid;}else{hi=mid;}
+          }
+          if(!best) best=await new Promise(r=>canvas.toBlob(r,"image/jpeg",0.5));
+          if(!best){ finish(file); return; }
+          finish(new File([best],file.name.replace(/\.[^/.]+$/,".jpg"),{type:"image/jpeg"}));
+        }catch(e){
+          finish(file);
         }
-        const canvas=document.createElement("canvas");
-        canvas.width=w; canvas.height=h;
-        canvas.getContext("2d").drawImage(img,0,0,w,h);
-        let lo=0.5,hi=0.96,best=null;
-        for(let i=0;i<8;i++){
-          const mid=(lo+hi)/2;
-          const blob=await new Promise(r=>canvas.toBlob(r,"image/jpeg",mid));
-          if(blob.size<=1.8*1024*1024){best=blob;lo=mid;}else{hi=mid;}
-        }
-        if(!best) best=await new Promise(r=>canvas.toBlob(r,"image/jpeg",0.5));
-        resolve(new File([best],file.name.replace(/\.[^/.]+$/,".jpg"),{type:"image/jpeg"}));
       };
       img.src=e.target.result;
     };
@@ -197,7 +256,8 @@ async function compressIfNeeded(file){
 btnConvert.addEventListener("click", doConvert);
 
 async function doConvert(){
-  if(!selectedFile || btnConvert.disabled) return;
+  if(!selectedFile || convertInFlight) return;
+  convertInFlight=true;
   hideError();
   btnConvert.disabled=true;
   uploadSection.style.display="none";
@@ -216,23 +276,25 @@ async function doConvert(){
   const timer=setInterval(()=>{
     if(si<steps.length){progressFill.style.width=steps[si][0]+"%";progressLabel.textContent=steps[si][1];si++;}
   },1100);
+  const controller=new AbortController();
+  const abortTimer=setTimeout(()=>controller.abort(), CONVERT_TIMEOUT_MS);
 
   try{
     const f=await compressIfNeeded(selectedFile);
     const fd=new FormData();
     fd.append("file",f);
-    const res=await fetch(`${API_URL}/convert`,{method:"POST",body:fd});
-    clearInterval(timer);
+    const res=await fetch(`${API_URL}/convert`,{method:"POST",body:fd,signal:controller.signal});
     if(!res.ok){
-      const err=await res.json().catch(()=>({detail:"Server error"}));
-      throw new Error(err.detail||"Conversion failed");
+      const err=await res.json().catch(()=>({}));
+      const httpErr=new Error(apiErrorMessage(err, res.status>=500 ? "Server error. Please try again." : "Conversion failed"));
+      httpErr.status=res.status;
+      throw httpErr;
     }
-    const data=await res.json();
+    const data=await res.json().catch(()=>null);
     if(!data || !Array.isArray(data.files)) throw new Error("Server returned an invalid conversion response.");
-    allFiles=data.files.filter(f=>f && ALLOWED_FORMATS.includes((f.format||"").toUpperCase()) && typeof f.data_b64==="string");
+    allFiles=data.files.filter(f=>f && ALLOWED_FORMATS.includes((f.format||"").toUpperCase()) && typeof f.data_b64==="string" && f.data_b64.length>0);
     if(allFiles.length===0) throw new Error("No downloadable files were returned. Please try again.");
 
-    // Save to 24hr history
     if(window.saveConversionToHistory) window.saveConversionToHistory(selectedFile.name, allFiles);
 
     progressFill.style.width="100%";
@@ -243,31 +305,33 @@ async function doConvert(){
       showResults();
     },400);
   }catch(err){
-    clearInterval(timer);
     progressWrap.classList.remove("show");
     uploadSection.style.display="";
     btnConvert.disabled=false;
-    const m=err.message||"";
-    if(m.includes("fetch")||m.includes("Failed")||m.includes("network")){
-      // Auto-retry countdown
+    const timedOut=err && err.name==="AbortError";
+    const m=timedOut ? "The conversion timed out. The server may be busy — please try again." : (err.message||"");
+    if(isRetryableNetworkError(err)){
+      hideError();
       let countdown=30;
-      showError(`Server waking up. Auto-retrying in ${countdown}s…`, false);
+      let fired=false;
+      const fireRetry=()=>{
+        if(fired) return;
+        fired=true;
+        hideError();
+        if(!convertInFlight) doConvert();
+      };
+      showError(`Server unavailable. Auto-retrying in ${countdown}s…`, false);
       retryTimer=setInterval(()=>{
         countdown--;
         if(countdown<=0){
-          clearInterval(retryTimer); retryTimer=null;
-          hideError();
-          doConvert();
+          fireRetry();
         } else {
-          errorWrap.replaceChildren(document.createTextNode(`⏳ Server waking up. Auto-retrying in ${countdown}s… `));
+          errorWrap.replaceChildren(document.createTextNode(`⏳ Server unavailable. Auto-retrying in ${countdown}s… `));
           const retryNow = document.createElement("button");
           retryNow.className = "btn-retry-inline";
           retryNow.id = "btnRetryNow";
           retryNow.textContent = "Retry now →";
-          retryNow.addEventListener("click",()=>{
-            clearInterval(retryTimer); retryTimer=null;
-            hideError(); doConvert();
-          });
+          retryNow.addEventListener("click", fireRetry);
           errorWrap.appendChild(retryNow);
         }
       },1000);
@@ -276,6 +340,10 @@ async function doConvert(){
     }else{
       showError(m||"Something went wrong.", true);
     }
+  } finally {
+    clearInterval(timer);
+    clearTimeout(abortTimer);
+    convertInFlight=false;
   }
 }
 
@@ -589,8 +657,8 @@ initOnboarding();
       mergeFill.style.width = "90%";
 
       if(!res.ok){
-        const err = await res.json().catch(()=>({detail:"Merge failed"}));
-        throw new Error(err.detail || "Merge failed");
+        const err = await res.json().catch(()=>({}));
+        throw new Error(apiErrorMessage(err, "Merge failed"));
       }
 
       const data = await res.json();
@@ -609,14 +677,10 @@ initOnboarding();
     } catch(err) {
       mergeProg.classList.remove("show");
       btnMerge.disabled = false;
-      const msg = err.message || "";
-      if(msg.includes("fetch") || msg.includes("Failed")){
-        mergeLabel.textContent = "Server waking up. Try again in 30s.";
-        mergeProg.classList.add("show");
-        mergeFill.style.width = "0%";
-      } else {
-        alert("⚠️ " + (msg || "Merge failed. Try again."));
-      }
+      const msg = isRetryableNetworkError(err)
+        ? "Server is unavailable. Please try merge again in a moment."
+        : (err.message || "Merge failed. Try again.");
+      alert("⚠️ " + msg);
     }
   });
 
@@ -704,8 +768,8 @@ initOnboarding();
       textFillExt.style.width = "90%";
 
       if(!res.ok){
-        const err = await res.json().catch(()=>({detail:"Extraction failed"}));
-        throw new Error(err.detail || "Extraction failed");
+        const err = await res.json().catch(()=>({}));
+        throw new Error(apiErrorMessage(err, "Extraction failed"));
       }
 
       const data = await res.json();
@@ -732,14 +796,10 @@ initOnboarding();
       textProgExt.classList.remove("show");
       btnTextExt.disabled = false;
       btnTextExt.textContent = "Extract Text →";
-      const msg = err.message || "";
-      if(msg.includes("fetch") || msg.includes("Failed")){
-        textLabelExt.textContent = "Server waking up. Try again in 30s.";
-        textProgExt.classList.add("show");
-        textFillExt.style.width = "0%";
-      } else {
-        alert("⚠️ " + (msg || "Extraction failed. Try again."));
-      }
+      const msg = isRetryableNetworkError(err)
+        ? "Server is unavailable. Please try extraction again in a moment."
+        : (err.message || "Extraction failed. Try again.");
+      alert("⚠️ " + msg);
     }
   });
 

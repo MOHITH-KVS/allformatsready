@@ -130,9 +130,16 @@ document.addEventListener("DOMContentLoaded", () => {
 function resetResult(){ document.getElementById("ppResultWrap").classList.remove("show"); window._ppOutCanvas=null; }
 
 function loadPPImage(file){
+  const ext=(file.name||"").split(".").pop().toLowerCase();
+  if(["heic","heif"].includes(ext)){
+    alert("HEIC/HEIF photos cannot be decoded in the extension photo tool. Convert the photo to JPG or PNG first, then upload.");
+    return;
+  }
   const reader=new FileReader();
+  reader.onerror=()=>alert("Could not read this image. Use JPG, PNG or WebP.");
   reader.onload=e=>{
     const img=new Image();
+    img.onerror=()=>alert("Could not read this image. Use JPG, PNG or WebP.");
     img.onload=()=>{
       ppImage=img; ppZoom=1.0;
       const zs=document.getElementById("ppZoomSlider");
