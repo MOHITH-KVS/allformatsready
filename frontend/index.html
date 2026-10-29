@@ -928,11 +928,11 @@
     }
 
     /* Tools section */
-    .tools-section{max-width:780px;margin:0 auto 48px;padding:0 20px}
+    .tools-section{max-width:780px;margin:40px auto 48px;padding:0 20px}
     .tools-header{text-align:center;margin-bottom:24px}
     .tools-title{font-size:1.3rem;font-weight:800;color:var(--gray-900);margin-bottom:6px}
     .tools-sub{font-size:.88rem;color:var(--gray-500)}
-    .tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .tools-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
     .tool-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--gray-200);padding:20px;display:flex;flex-direction:column;gap:12px}
     .tool-card-title{font-size:.95rem;font-weight:800;color:var(--gray-900);display:flex;align-items:center;gap:8px}
     .tool-card-desc{font-size:.78rem;color:var(--gray-500);line-height:1.5;margin-top:-6px}
@@ -999,6 +999,7 @@
       .ext-promo-card{flex-direction:column;text-align:center;gap:10px}
       .btn-ext{width:100%;text-align:center}
       .how-section{padding:0 12px}
+      .tools-section{padding:0 12px}
       /* Header */
       header{padding:10px 12px;gap:8px}
       .header-pills{display:none} /* hide pills on mobile — save space */
@@ -1095,12 +1096,12 @@
 <div class="upload-wrap">
 <div class="card" id="uploadCard">
   <div class="drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif" multiple/>
+    <input type="file" id="fileInput" accept=".pdf,.docx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif" multiple/>
     <span class="drop-icon">📂</span>
     <div class="drop-title">Drop your document here or click to browse</div>
-    <div class="drop-sub">PDF, JPG, PNG, WebP, HEIC — max 10MB · Select multiple images at once</div>
+    <div class="drop-sub">PDF, DOCX, JPG, PNG, WebP, HEIC — max 10MB · Select multiple images at once</div>
     <div class="drop-formats">
-      <span class="drop-fmt">PDF</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
+      <span class="drop-fmt">PDF</span><span class="drop-fmt">DOCX</span><span class="drop-fmt">JPG</span><span class="drop-fmt">PNG</span>
       <span class="drop-fmt">WebP</span><span class="drop-fmt">BMP</span>
       <span class="drop-fmt">GIF</span><span class="drop-fmt">TIFF</span><span class="drop-fmt">HEIC</span>
     </div>
@@ -1211,52 +1212,6 @@
   <div class="cards-grid" id="cardsGrid"></div>
 </div>
 
-<!-- How to use -->
-<section class="how-section" id="how-to-use">
-  <div class="how-title">How to use AllFormatsReady</div>
-  <div class="how-steps">
-    <div class="how-step">
-      <div class="how-step-num">1</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Upload your document</div>
-        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, JPG, PNG, WebP, HEIC — up to 10MB.</div>
-        <span class="how-step-tip">💡 Works with Aadhaar, PAN, Passport, certificates, and any image</span>
-      </div>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">2</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Click "Generate All Formats"</div>
-            <div class="how-step-desc">All versions are created simultaneously — compressed PDF, JPG size targets, PNG, WebP, and DOCX output. Takes 5-15 seconds.</div>
-      </div>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">3</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Choose your portal (optional)</div>
-        <div class="how-step-desc">Click EPFO, Bank KYC, UIDAI or any portal — the right format gets highlighted at top automatically.</div>
-        <span class="how-step-tip">💡 12 Indian government and banking portals supported</span>
-      </div>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">4</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Download only what you need</div>
-        <div class="how-step-desc">Click any individual file card to download just that format. Or use "Download All as ZIP" to get everything at once.</div>
-      </div>
-    </div>
-    <div class="how-step" style="border-color:#BFDBFE;background:#EFF6FF">
-      <div class="how-step-num" style="background:#1D4ED8">🧩</div>
-      <div class="how-step-content">
-        <div class="how-step-title" style="color:#1E40AF">Pro tip — Use the Chrome Extension!</div>
-        <div class="how-step-desc" style="color:#3B82F6">Install our Chrome Extension v4 — convert documents while filling any form without switching tabs. Auto-detects 30+ portals. Includes a Passport Photo generator and conversion history!</div>
-        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ ⬇ Download Extension v4 Free →</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-
 <!-- Extra Tools: PDF Merge + PDF to Text -->
 <section class="tools-section">
   <div class="tools-header">
@@ -1313,6 +1268,52 @@
       <button class="btn-tool btn-tool-blue" id="btnExtractText" disabled>Extract Text →</button>
     </div>
 
+  </div>
+</section>
+
+
+<!-- How to use -->
+<section class="how-section" id="how-to-use">
+  <div class="how-title">How to use AllFormatsReady</div>
+  <div class="how-steps">
+    <div class="how-step">
+      <div class="how-step-num">1</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Upload your document</div>
+        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, DOCX, JPG, PNG, WebP, HEIC — up to 10MB.</div>
+        <span class="how-step-tip">💡 Works with Aadhaar, PAN, Passport, certificates, and any image</span>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">2</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Click "Generate All Formats"</div>
+            <div class="how-step-desc">All versions are created simultaneously — compressed PDF, JPG size targets, PNG, WebP, and DOCX output. Takes 5-15 seconds.</div>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">3</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Choose your portal (optional)</div>
+        <div class="how-step-desc">Click EPFO, Bank KYC, UIDAI or any portal — the right format gets highlighted at top automatically.</div>
+        <span class="how-step-tip">💡 12 Indian government and banking portals supported</span>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">4</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Download only what you need</div>
+        <div class="how-step-desc">Click any individual file card to download just that format. Or use "Download All as ZIP" to get everything at once.</div>
+      </div>
+    </div>
+    <div class="how-step" style="border-color:#BFDBFE;background:#EFF6FF">
+      <div class="how-step-num" style="background:#1D4ED8">🧩</div>
+      <div class="how-step-content">
+        <div class="how-step-title" style="color:#1E40AF">Pro tip — Use the Chrome Extension!</div>
+        <div class="how-step-desc" style="color:#3B82F6">Install our Chrome Extension v4 — convert documents while filling any form without switching tabs. Auto-detects 30+ portals. Includes a Passport Photo generator and conversion history!</div>
+        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ ⬇ Download Extension v4 Free →</a>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -1435,7 +1436,7 @@
 </footer>
 
 <script>
-  const API_URL = "https://allformatsready.onrender.com";
+  // API_URL, CONVERT_MAX_BYTES and MERGE_MAX_BYTES are declared once in the first script block.
 
   // ── FAQ Data ──
   const FAQS = [
@@ -1449,7 +1450,7 @@
     {icon:"🧩", q:"What is the Chrome Extension and how is it different?", a:"The Chrome Extension lets you convert documents directly while filling any form — without switching tabs. It auto-detects 30+ Indian portals (EPFO, HDFC, SBI, UIDAI, Naukri etc.) and shows the right format at the top. Download free from GitHub."},
     {icon:"🛡️", q:"Is my Aadhaar card safe to upload here?", a:"Your file is processed on the server and sensitive-document handling is reported when the text layer can be verified. Scanned-image redaction is not supported. Server retention and deletion depend on the deployment and are not guaranteed by this page."},
     {icon:"📦", q:"Do I need to download everything as a ZIP?", a:"No — that's the point! Each format has its own Download button. If you only need JPG under 200KB, download just that. ZIP is available if you want everything at once."},
-    {icon:"📝", q:"Can I upload a Word document (DOCX)?", a:"The website converter and its PDF-to-text tool accept PDFs and images, not DOCX uploads. Export your Word document as PDF first. DOCX text extraction is available only through the separate backend/extension workflow."},
+    {icon:"📝", q:"Can I upload a Word document (DOCX)?", a:"Yes. Upload a .docx file in the main converter and it is rendered to PDF first, then converted to every format. Layout is a best-effort rendering (text, tables, and embedded images), so complex designs may differ slightly from Word. Legacy .doc files are not supported; save them as .docx first. The PDF to Text tool accepts PDFs only."},
     {icon:"🆓", q:"Is AllFormatsReady completely free? Any hidden charges?", a:"100% free. No account, no sign-up, no credit card, no watermarks, no hidden charges. We plan to keep the core tool free forever."},
   ];
 
@@ -1482,7 +1483,7 @@
   let timerInterval = null;
   let totalPages = 1;
   let convertInFlight = false;
-  const CONVERT_EXTS = ["pdf","jpg","jpeg","png","webp","gif","bmp","tiff","tif","heic","heif"];
+  const CONVERT_EXTS = ["pdf","docx","jpg","jpeg","png","webp","gif","bmp","tiff","tif","heic","heif"];
   const CONVERT_TIMEOUT_MS = 120000;
 
   // ── Elements ──
@@ -1512,9 +1513,6 @@
   const timerRingFill   = document.getElementById("timerRingFill");
 
   const CIRCUMFERENCE = 2 * Math.PI * 11; // r=11
-  const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
-  const MERGE_MAX_BYTES = 30 * 1024 * 1024;
-
   function formatBytes(b){
     if(b<1024) return b+" B";
     if(b<1048576) return (b/1024).toFixed(1)+" KB";
@@ -1570,7 +1568,7 @@
     sensitiveNotice.classList.remove("show","success");
     const files = Array.isArray(data?.files) ? data.files : [];
     const masked = files.find(file => file && file.format === "PDF" && typeof file.label === "string" && file.label.startsWith("Masked "));
-    const backendNotice = typeof data?.sensitive_notice === "string" ? data.sensitive_notice : "";
+    const backendNotice = [data?.sensitive_notice, data?.conversion_notice].filter(n => typeof n === "string" && n).join(" ");
     if(!masked && !backendNotice) return;
 
     const icon = document.createElement("span");
@@ -1596,7 +1594,7 @@
       return;
     }
     if(!CONVERT_EXTS.includes(ext)){
-      rejectSelection(`Format .${ext} not supported. Use PDF, JPG, PNG, WebP, HEIC, GIF, BMP or TIFF.`);
+      rejectSelection(`Format .${ext} not supported. Use PDF, DOCX, JPG, PNG, WebP, HEIC, GIF, BMP or TIFF.`);
       return;
     }
     selectedFile = file;

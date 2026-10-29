@@ -5,6 +5,7 @@ const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
 
 let selectedFile = null;
 let allFiles = [];
+let conversionNotice = "";
 let activePortal = null;
 let activeFilter = "ALL";
 let convertStartTime = 0;
@@ -49,6 +50,7 @@ function getFileIcon(name){
   if(["jpg","jpeg"].includes(ext)) return "📷";
   if(ext==="png") return "🖼️";
   if(["heic","heif"].includes(ext)) return "📸";
+  if(ext==="docx") return "📝";
   return "📄";
 }
 function fmtClass(fmt){
@@ -147,14 +149,14 @@ function setFile(file){
     return;
   }
   const ext=file.name.split(".").pop().toLowerCase();
-  const allowed=["pdf","jpg","jpeg","png","webp","heic","heif"];
+  const allowed=["pdf","docx","jpg","jpeg","png","webp","heic","heif"];
   if(!allowed.includes(ext)){
     selectedFile=null;
     fileInput.value="";
     filePreview.classList.remove("show");
     dropZone.style.display="";
     btnConvert.disabled=true;
-    showError(`Format .${ext} not supported. Use PDF, JPG, PNG, WebP or HEIC.`);
+    showError(ext==="doc" ? "Legacy .doc is not supported. Save it as .docx or PDF in Word first." : `Format .${ext} not supported. Use PDF, DOCX, JPG, PNG, WebP or HEIC.`);
     return;
   }
   selectedFile=file;
@@ -169,7 +171,7 @@ function setFile(file){
 
 function reset(){
   hideError();
-  selectedFile=null; allFiles=[];
+  selectedFile=null; allFiles=[]; conversionNotice="";
   fileInput.value="";
   filePreview.classList.remove("show");
   dropZone.style.display="";
@@ -294,6 +296,7 @@ async function doConvert(){
     if(!data || !Array.isArray(data.files)) throw new Error("Server returned an invalid conversion response.");
     allFiles=data.files.filter(f=>f && ALLOWED_FORMATS.includes((f.format||"").toUpperCase()) && typeof f.data_b64==="string" && f.data_b64.length>0);
     if(allFiles.length===0) throw new Error("No downloadable files were returned. Please try again.");
+    conversionNotice=typeof data.conversion_notice==="string" ? data.conversion_notice : "";
 
     if(window.saveConversionToHistory) window.saveConversionToHistory(selectedFile.name, allFiles);
 
@@ -350,6 +353,8 @@ async function doConvert(){
 // ── Show Results ──
 function showResults(){
   resultsWrap.classList.add("show");
+  const noticeEl=document.getElementById("convNotice");
+  if(noticeEl){ noticeEl.textContent=conversionNotice ? "⚠️ "+conversionNotice : ""; noticeEl.classList.toggle("show",!!conversionNotice); }
   const elapsed=((Date.now()-convertStartTime)/1000).toFixed(1);
   resultsCount.textContent=`${allFiles.length} files generated`;
   if(resultsTime) resultsTime.textContent=`in ${elapsed}s`;

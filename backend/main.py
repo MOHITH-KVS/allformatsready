@@ -91,6 +91,7 @@ async def add_cors_headers(request: Request, call_next):
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
 MAX_MERGE_SIZE = 30 * 1024 * 1024
+MAX_DOCX_UNCOMPRESSED = int(os.getenv("MAX_DOCX_UNCOMPRESSED", str(60 * 1024 * 1024)))
 MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "50"))
 MAX_IMAGE_DIMENSION = int(os.getenv("MAX_IMAGE_DIMENSION", "10000"))
 MAX_IMAGE_PIXELS = int(os.getenv("MAX_IMAGE_PIXELS", "50000000"))
@@ -409,34 +410,363 @@ def img_bytes(img, fmt, quality=85):
 
 
 def pil_to_docx(imgs) -> bytes:
-    """Embed one or more PIL images into a single DOCX file — one image per page."""
+    """Embed one or more PIL images into a single DOCX file — one image per page.
+
+    Each image is scaled to fit inside the page's printable area (aspect ratio preserved) so
+    it is never cropped or pushed off the page, and every page after the first starts with
+    a page-break-before on its own picture paragraph (no stray blank pages).
+    """
     if DocxDocument is None:
         return b""
     try:
+        from docx.shared import Emu, Inches
         doc = DocxDocument()
-        # If single image passed, wrap in list
         if not isinstance(imgs, list):
             imgs = [imgs]
+        section = doc.sections[0]
+        section.left_margin = section.right_margin = Inches(0.5)
+        section.top_margin = section.bottom_margin = Inches(0.5)
+        avail_w = int(section.page_width - section.left_margin - section.right_margin)
+        # Leave a little vertical slack so the picture paragraph never spills onto a new page.
+        avail_h = int(section.page_height - section.top_margin - section.bottom_margin - Inches(0.25))
         for idx, img in enumerate(imgs):
+            rgb = image_to_rgb(img)
             buf = io.BytesIO()
-            img.save(buf, format="PNG")
+            rgb.save(buf, format="JPEG", quality=88, optimize=True)
             buf.seek(0)
-            doc.add_picture(buf, width=None)
-            # Add page break between pages (not after last)
-            if idx < len(imgs) - 1:
-                from docx.oxml.ns import qn
-                from docx.oxml import OxmlElement
-                p = doc.add_paragraph()
-                run = p.add_run()
-                br = OxmlElement('w:br')
-                br.set(qn('w:type'), 'page')
-                run._r.append(br)
+            aspect = rgb.height / max(rgb.width, 1)
+            width = avail_w
+            height = int(width * aspect)
+            if height > avail_h:
+                height = avail_h
+                width = int(height / max(aspect, 1e-6))
+            doc.add_picture(buf, width=Emu(max(width, 1)), height=Emu(max(height, 1)))
+            if idx > 0:
+                doc.paragraphs[-1].paragraph_format.page_break_before = True
         out = io.BytesIO()
         doc.save(out)
         return out.getvalue()
-    except Exception as exc:
-        logger.warning("DOCX generation failed: %s", type(exc).__name__)
+    except Exception:
+        logger.exception("DOCX generation failed")
         return b""
+
+
+# ── DOCX → PDF (pure Python, no LibreOffice needed on the free Render tier) ──
+_DOCX_FONT_CACHE = None
+
+
+def _docx_pdf_fonts():
+    """(regular, bold, italic, bold-italic, unicode_ok). Uses DejaVu when installed, else Helvetica."""
+    global _DOCX_FONT_CACHE
+    if _DOCX_FONT_CACHE is not None:
+        return _DOCX_FONT_CACHE
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.lib.fonts import addMapping
+    for base in ("/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/dejavu", "/usr/share/fonts/TTF"):
+        files = {k: os.path.join(base, v) for k, v in (
+            ("r", "DejaVuSans.ttf"), ("b", "DejaVuSans-Bold.ttf"),
+            ("i", "DejaVuSans-Oblique.ttf"), ("bi", "DejaVuSans-BoldOblique.ttf"))}
+        if all(os.path.exists(p) for p in files.values()):
+            try:
+                for key, name in (("r", "AFRSans"), ("b", "AFRSans-B"), ("i", "AFRSans-I"), ("bi", "AFRSans-BI")):
+                    pdfmetrics.registerFont(TTFont(name, files[key]))
+                addMapping("AFRSans", 0, 0, "AFRSans"); addMapping("AFRSans", 1, 0, "AFRSans-B")
+                addMapping("AFRSans", 0, 1, "AFRSans-I"); addMapping("AFRSans", 1, 1, "AFRSans-BI")
+                _DOCX_FONT_CACHE = ("AFRSans", "AFRSans-B", "AFRSans-I", "AFRSans-BI", True)
+                return _DOCX_FONT_CACHE
+            except Exception:
+                logger.warning("Could not register DejaVu fonts; falling back to Helvetica")
+    _DOCX_FONT_CACHE = ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique", False)
+    return _DOCX_FONT_CACHE
+
+
+def docx_to_pdf_bytes(docx_bytes: bytes):
+    """Best-effort render of a .docx (text, headings, lists, tables, inline images) to a text-layer PDF.
+
+    Returns (pdf_bytes, notice) where notice is a user-facing warning string or None."""
+    import zipfile
+    from xml.sax.saxutils import escape
+    try:
+        from docx import Document as DocxDoc
+        from docx.table import Table as DocxTable
+        from docx.text.paragraph import Paragraph as DocxPara
+        from docx.text.run import Run as DocxRun
+        from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.platypus import (Image as RLImage, PageBreak, Paragraph,
+                                        SimpleDocTemplate, Spacer, Table, TableStyle)
+    except ImportError as exc:
+        raise RuntimeError("DOCX support libraries are not installed") from exc
+
+    # ── Safety: must be a real OOXML zip, and not a zip bomb ──
+    try:
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as zf:
+            infos = zf.infolist()
+            if "word/document.xml" not in {i.filename for i in infos}:
+                raise InvalidUploadError("This is not a valid Word (.docx) document.")
+            if len(infos) > 3000 or sum(i.file_size for i in infos) > MAX_DOCX_UNCOMPRESSED:
+                raise InvalidUploadError("This Word document is too large to process safely.")
+    except zipfile.BadZipFile as exc:
+        raise InvalidUploadError("This is not a valid Word (.docx) document.") from exc
+    try:
+        doc = DocxDoc(io.BytesIO(docx_bytes))
+    except Exception as exc:
+        raise InvalidUploadError("Could not read the Word document. It may be corrupt or password-protected.") from exc
+
+    f_reg, f_bold, f_ital, f_bi, unicode_ok = _docx_pdf_fonts()
+
+    unsupported = [False]
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        covered = pdfmetrics.getFont(f_reg).face.charToGlyph if unicode_ok else None
+    except Exception:
+        covered = None
+
+    def clean(text):
+        """Swap characters the renderer cannot draw for '?' (never emit blank/null glyphs)."""
+        if unicode_ok and covered is not None:
+            out = "".join(ch if (ord(ch) in covered or ch in "\n\t\r") else "?" for ch in text)
+        elif unicode_ok:
+            out = text
+        else:
+            out = text.encode("cp1252", "replace").decode("cp1252")
+        if out != text:
+            unsupported[0] = True
+        return out
+
+    # ── Page geometry from the first section ──
+    sec = doc.sections[0]
+    def pts(v, default):
+        try:
+            return float(v.pt) if v is not None else default
+        except Exception:
+            return default
+    pw, ph = pts(sec.page_width, 595.3), pts(sec.page_height, 841.9)
+    pw, ph = min(max(pw, 200.0), 2000.0), min(max(ph, 200.0), 2000.0)
+    lm, rm = pts(sec.left_margin, 72.0), pts(sec.right_margin, 72.0)
+    tm, bm = pts(sec.top_margin, 72.0), pts(sec.bottom_margin, 72.0)
+    lm, rm = min(max(lm, 18.0), pw * 0.3), min(max(rm, 18.0), pw * 0.3)
+    tm, bm = min(max(tm, 18.0), ph * 0.3), min(max(bm, 18.0), ph * 0.3)
+    frame_w, frame_h = pw - lm - rm, ph - tm - bm
+
+    base_size = 11.0
+    align_map = {1: TA_CENTER, 2: TA_RIGHT, 3: TA_JUSTIFY}
+    heading_sizes = {"title": 24, "heading 1": 20, "heading 2": 16, "heading 3": 14, "heading 4": 12.5}
+    total_pixels = [0]
+
+    def style_name(p):
+        try:
+            return (p.style.name or "").lower()
+        except Exception:
+            return ""
+
+    def run_markup(run):
+        text = run.text
+        if not text:
+            return "", 0.0
+        out = escape(clean(text)).replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;").replace("\n", "<br/>")
+        size = 0.0
+        try:
+            if run.bold: out = f"<b>{out}</b>"
+            if run.italic: out = f"<i>{out}</i>"
+            if run.underline: out = f"<u>{out}</u>"
+            attrs = ""
+            if run.font.size:
+                size = float(run.font.size.pt)
+                attrs += f' size="{size:g}"'
+            rgb = run.font.color.rgb if run.font.color is not None and run.font.color.type is not None else None
+            if rgb is not None and str(rgb) != "000000":
+                attrs += f' color="#{rgb}"'
+            if attrs:
+                out = f"<font{attrs}>{out}</font>"
+        except Exception:
+            pass
+        return out, size
+
+    def inline_images(run):
+        flows = []
+        for rid in run._r.xpath(".//a:blip/@r:embed"):
+            try:
+                blob = doc.part.related_parts[rid].blob
+                with Image_cls.open(io.BytesIO(blob)) as im:
+                    w, h = im.size
+                    total_pixels[0] += w * h
+                    if w < 1 or h < 1 or w * h > MAX_IMAGE_PIXELS or total_pixels[0] > MAX_TOTAL_IMAGE_PIXELS:
+                        continue
+                    png = io.BytesIO()
+                    image_to_rgb(im.copy()).save(png, format="PNG")
+                scale = min(1.0, frame_w / (w * 0.75), (frame_h * 0.9) / (h * 0.75))
+                png.seek(0)
+                flows.append(RLImage(png, width=w * 0.75 * scale, height=h * 0.75 * scale))
+            except Exception:
+                continue  # unsupported image type (e.g. EMF/WMF) — skip rather than fail the document
+        return flows
+
+    def para_to_flowables(p, in_cell=False):
+        name = style_name(p)
+        parts, max_size, images, page_break = [], 0.0, [], False
+        try:
+            inner = list(p.iter_inner_content())
+        except Exception:
+            inner = list(p.runs)
+        for item in inner:
+            runs = [item] if isinstance(item, DocxRun) else list(getattr(item, "runs", []))
+            for r in runs:
+                markup, size = run_markup(r)
+                parts.append(markup); max_size = max(max_size, size)
+                images.extend(inline_images(r))
+                if r._r.xpath('.//w:br[@w:type="page"]'):
+                    page_break = True
+        text = "".join(parts)
+        size = heading_sizes.get(name, 0) or max(max_size, 0) or base_size
+        if in_cell:
+            size = min(size, 10.0) if not max_size else size
+        heading = name in heading_sizes
+        try:
+            numbered = p._p.pPr is not None and p._p.pPr.numPr is not None
+        except Exception:
+            numbered = False
+        is_list = numbered or name.startswith("list")
+        if is_list and text.strip():
+            level = 0
+            try:
+                level = int(p._p.pPr.numPr.ilvl.val) if numbered and p._p.pPr.numPr.ilvl is not None else 0
+            except Exception:
+                level = 0
+            text = "•&nbsp;&nbsp;" + text
+            left_indent = 18 + 18 * level
+        else:
+            left_indent = 0
+        align = p.alignment if p.alignment is not None else getattr(p.style.paragraph_format, "alignment", None)
+        st = ParagraphStyle(
+            "afr", fontName=f_bold if heading else f_reg, fontSize=size, leading=size * 1.3,
+            alignment=align_map.get(int(align), TA_LEFT) if align is not None else TA_LEFT,
+            leftIndent=left_indent, firstLineIndent=-12 if is_list else 0,
+            spaceBefore=10 if heading else 0, spaceAfter=(8 if heading else (2 if in_cell else 6)),
+            bulletFontName=f_reg,
+        )
+        flows = []
+        if text.strip():
+            try:
+                flows.append(Paragraph(text, st))
+            except Exception:
+                flows.append(Paragraph(escape(clean(p.text)), st))
+        elif not images and not in_cell:
+            flows.append(Spacer(1, size * 0.9))
+        flows.extend(images)
+        if page_break:
+            flows.append(PageBreak())
+        return flows
+
+    def table_to_flowable(tbl):
+        grid = [[cell for cell in row.cells] for row in tbl.rows]
+        if not grid:
+            return None
+        ncols = max(len(r) for r in grid)
+        spans, first_seen, data = [], {}, []
+        for ri, row in enumerate(grid):
+            data_row = []
+            for ci in range(ncols):
+                cell = row[ci] if ci < len(row) else None
+                if cell is None:
+                    data_row.append("")
+                    continue
+                key = id(cell._tc)
+                if key in first_seen:           # merged continuation: keep content only once
+                    first_seen[key][2:] = [ci, ri]
+                    data_row.append("")
+                else:
+                    first_seen[key] = [ci, ri, ci, ri]
+                    inner = []
+                    for cp in cell.paragraphs:
+                        inner.extend(para_to_flowables(cp, in_cell=True))
+                    data_row.append(inner or "")
+            data.append(data_row)
+        for c0, r0, c1, r1 in first_seen.values():
+            if (c1, r1) != (c0, r0):
+                spans.append(("SPAN", (c0, r0), (c1, r1)))
+        t = Table(data, colWidths=[frame_w / ncols] * ncols, splitByRow=1)
+        t.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9CA3AF")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ] + spans))
+        return t
+
+    story = []
+    try:
+        for child in doc.element.body.iterchildren():
+            tag = child.tag.rsplit("}", 1)[-1]
+            if tag == "p":
+                story.extend(para_to_flowables(DocxPara(child, doc)))
+            elif tag == "tbl":
+                flow = table_to_flowable(DocxTable(child, doc))
+                if flow is not None:
+                    story.extend([flow, Spacer(1, 8)])
+    except InvalidUploadError:
+        raise
+    except Exception as exc:
+        raise InvalidUploadError("Could not read the contents of this Word document.") from exc
+
+    if not story:
+        raise InvalidUploadError("This Word document appears to be empty.")
+
+    too_long = [False]
+
+    def page_guard(canvas, _doc):
+        if canvas.getPageNumber() > MAX_PDF_PAGES:
+            too_long[0] = True
+            raise InvalidUploadError("page limit")  # message is rewritten below (reportlab decorates it)
+
+    out = io.BytesIO()
+    template = SimpleDocTemplate(out, pagesize=(pw, ph), leftMargin=lm, rightMargin=rm,
+                                 topMargin=tm, bottomMargin=bm, title="Converted document")
+    try:
+        template.build(story, onFirstPage=page_guard, onLaterPages=page_guard)
+    except Exception as exc:
+        if too_long[0]:
+            raise InvalidUploadError(
+                f"This document renders to more than {MAX_PDF_PAGES} pages, which is the maximum."
+            ) from exc
+        if isinstance(exc, InvalidUploadError):
+            raise
+        logger.exception("DOCX → PDF layout failed")
+        raise InvalidUploadError("This Word document could not be laid out for conversion.") from exc
+    notice = None
+    if unsupported[0]:
+        notice = ("Some characters in this Word document (for example Hindi/Telugu or other complex scripts) "
+                  "could not be rendered and were replaced with '?'. For documents in those scripts, use "
+                  "Word's File → Save as PDF and upload the PDF instead.")
+    return ensure_output(out.getvalue(), "DOCX to PDF"), notice
+
+
+def docx_plain_text(docx_bytes: bytes) -> str:
+    """Body text of a .docx in document order, including table cells."""
+    from docx import Document as DocxDoc
+    from docx.table import Table as DocxTable
+    from docx.text.paragraph import Paragraph as DocxPara
+    doc = DocxDoc(io.BytesIO(docx_bytes))
+    lines = []
+    for child in doc.element.body.iterchildren():
+        tag = child.tag.rsplit("}", 1)[-1]
+        if tag == "p":
+            text = DocxPara(child, doc).text
+            if text.strip():
+                lines.append(text)
+        elif tag == "tbl":
+            for row in DocxTable(child, doc).rows:
+                seen, cells = None, []
+                for cell in row.cells:
+                    if seen is not None and cell._tc is seen:
+                        continue
+                    seen = cell._tc
+                    cells.append(" ".join(p.text.strip() for p in cell.paragraphs if p.text.strip()))
+                if any(cells):
+                    lines.append(" | ".join(cells))
+    return "\n".join(lines)
 
 
 def make_file(name, fmt, data, label, category, page=None):
@@ -503,6 +833,15 @@ async def convert(request: Request, file: UploadFile = File(...)):
         file_bytes = await read_upload(file)
         outputs = []
         total_pages = 1
+        docx_notice = None
+
+        # DOCX upload → render to PDF first, then reuse the normal PDF pipeline below.
+        if upload_extension(filename) == "docx" or (upload_extension(filename) == "doc" and looks_like_docx(file_bytes)):
+            if not looks_like_docx(file_bytes):
+                raise InvalidUploadError("This is not a valid Word (.docx) document.")
+            file_bytes, docx_notice = docx_to_pdf_bytes(file_bytes)
+        elif upload_extension(filename) == "doc":
+            raise InvalidUploadError("Legacy .doc files are not supported. Open it in Word and save as .docx or PDF.")
 
         if file_bytes.startswith(b"%PDF-"):
             doc = open_pdf(file_bytes)
@@ -548,8 +887,6 @@ async def convert(request: Request, file: UploadFile = File(...)):
         else:
             if upload_extension(filename) == "pdf":
                 raise InvalidUploadError("The uploaded file is not a valid PDF.")
-            if upload_extension(filename) in {"doc", "docx"} and looks_like_docx(file_bytes):
-                raise InvalidUploadError("DOCX upload not supported. Please convert to PDF first, then upload.")
             img = open_image(file_bytes)
             outputs.extend(image_outputs(img))
             raw_pdf = img_bytes(img, "PDF")
@@ -564,6 +901,8 @@ async def convert(request: Request, file: UploadFile = File(...)):
         response = {"files": outputs, "total": len(outputs), "total_pages": total_pages}
         if file_bytes.startswith(b"%PDF-") and sensitive_notice:
             response["sensitive_notice"] = sensitive_notice
+        if docx_notice:
+            response["conversion_notice"] = docx_notice
         return JSONResponse(content=response)
     except InvalidUploadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -811,17 +1150,15 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
             finally:
                 doc.close()
 
-        # ── Image → OCR using PyMuPDF's Tesseract integration ──
+        # ── DOCX → read text directly (paragraphs and tables) ──
         elif ext in ["docx", "doc"] and looks_like_docx(file_bytes):
             try:
-                from docx import Document as DocxDoc
-                doc = DocxDoc(io.BytesIO(file_bytes))
-                paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-                full_text = "\n".join(paragraphs)
+                full_text = docx_plain_text(file_bytes)
                 pages_text = [{"page": 1, "text": full_text, "chars": len(full_text)}]
                 total_pages = 1
             except Exception as exc:
                 raise InvalidUploadError("Could not read the DOCX document.") from exc
+        # ── Image → OCR using PyMuPDF's Tesseract integration ──
         else:
             try:
                 img = open_image(file_bytes)
