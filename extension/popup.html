@@ -276,6 +276,54 @@
     /* Footer */
     .ext-footer{padding:6px 10px;border-top:1px solid var(--gray-100);text-align:center;font-size:.6rem;color:var(--gray-400)}
     .ext-footer a{color:var(--brand);text-decoration:none;font-weight:600}
+
+    /* ═══ Micro-interactions (v1.1 polish) ═══ */
+    @keyframes afrIn{from{opacity:0;transform:translateY(8px)}}
+    @keyframes afrFade{from{opacity:0;transform:translateY(4px)}}
+    @keyframes afrPop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+    @keyframes afrFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+    @keyframes afrShimmer{to{background-position:-200% 0}}
+    @keyframes afrRipple{to{transform:scale(3.2);opacity:0}}
+    @keyframes afrToastIn{from{opacity:0;transform:translate(-50%,10px)}}
+    @keyframes afrTabBounce{40%{transform:translateY(-2px)}}
+    .tab-panel.active{animation:afrFade .22s ease}
+    .tab-btn.active{animation:afrTabBounce .28s ease}
+    .tab-btn{position:relative}
+    .tab-btn:active{transform:scale(.95)}
+    button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+    .drop-zone:focus-within,.tool-drop-ext:focus-within,.pp-drop:focus-within{border-color:var(--brand)}
+    .drop-icon{animation:afrFloat 3s ease-in-out infinite}
+    .drop-zone.dragover,.tool-drop-ext.dragover,.pp-drop.dragover{transform:scale(1.02);box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+    .drop-zone.dragover .drop-icon{animation:afrPop .4s ease}
+    .drop-zone,.tool-drop-ext,.pp-drop{transition:all .2s}
+    .file-preview.show{animation:afrPop .25s ease}
+    .progress-bar-fill,.tool-prog-fill{background:linear-gradient(90deg,var(--brand),#60A5FA,var(--brand));background-size:200% 100%;animation:afrShimmer 1.3s linear infinite}
+    .results-wrap.show .results-title{animation:afrPop .35s ease}
+    .cards-list .file-card{animation:afrIn .28s ease backwards}
+    .cards-list .file-card:nth-child(1){animation-delay:0.000s}
+    .cards-list .file-card:nth-child(2){animation-delay:0.035s}
+    .cards-list .file-card:nth-child(3){animation-delay:0.070s}
+    .cards-list .file-card:nth-child(4){animation-delay:0.105s}
+    .cards-list .file-card:nth-child(5){animation-delay:0.140s}
+    .cards-list .file-card:nth-child(6){animation-delay:0.175s}
+    .cards-list .file-card:nth-child(7){animation-delay:0.210s}
+    .cards-list .file-card:nth-child(8){animation-delay:0.245s}
+    .cards-list .file-card:nth-child(9){animation-delay:0.280s}
+    .cards-list .file-card:nth-child(10){animation-delay:0.315s}
+    .cards-list .file-card:nth-child(11){animation-delay:0.350s}
+    .cards-list .file-card:nth-child(12){animation-delay:0.385s}
+    .file-card:hover{transform:translateX(2px)}
+    .history-item:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.06)}
+    .history-item,.filter-chip{transition:all .15s}
+    .filter-chip.active{animation:afrPop .22s ease}
+    .btn-convert,.btn-tool-ext,.btn-pp-generate,.btn-zip,.btn-again,.btn-onboard-start,.btn-dl,.btn-copy,.btn-copy-ext{position:relative;overflow:hidden;transition:background .2s,transform .12s,box-shadow .2s}
+    .btn-convert:hover:not(:disabled),.btn-tool-ext:hover:not(:disabled),.btn-pp-generate:hover:not(:disabled),.btn-onboard-start:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(37,99,235,.25)}
+    .btn-convert:active:not(:disabled),.btn-tool-ext:active:not(:disabled),.btn-pp-generate:active:not(:disabled),.btn-zip:active,.btn-again:active,.btn-dl:active,.btn-copy:active,.btn-onboard-start:active{transform:translateY(0) scale(.97);box-shadow:none}
+    .afr-ripple{position:absolute;border-radius:50%;width:24px;height:24px;margin:-12px 0 0 -12px;background:rgba(255,255,255,.55);transform:scale(0);animation:afrRipple .5s ease-out forwards;pointer-events:none}
+    .btn-again .afr-ripple,.btn-copy .afr-ripple,.btn-copy-ext .afr-ripple{background:rgba(37,99,235,.25)}
+    .afr-toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:var(--gray-900);color:#fff;font-size:.7rem;font-weight:600;padding:7px 12px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:50;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
+    .afr-toast.show{display:block;animation:afrToastIn .2s ease}
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   </style>
 </head>
 <body>
@@ -558,6 +606,7 @@
   &nbsp;·&nbsp; AllFormatsReady
 </div>
 
+<div class="afr-toast" id="afrToast" role="status" aria-live="polite"></div>
 <script src="portals.js"></script>
 <script src="popup.js"></script>
 <script src="passport.js"></script>

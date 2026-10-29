@@ -356,7 +356,7 @@ function showResults(){
   const noticeEl=document.getElementById("convNotice");
   if(noticeEl){ noticeEl.textContent=conversionNotice ? "⚠️ "+conversionNotice : ""; noticeEl.classList.toggle("show",!!conversionNotice); }
   const elapsed=((Date.now()-convertStartTime)/1000).toFixed(1);
-  resultsCount.textContent=`${allFiles.length} files generated`;
+  afrCountUp(resultsCount,allFiles.length," files generated");
   if(resultsTime) resultsTime.textContent=`in ${elapsed}s`;
 
   // Build filter chips
@@ -477,6 +477,7 @@ function buildCard(f,isRec){
         const blob=new Blob([ba],{type:mime});
         await navigator.clipboard.write([new ClipboardItem({[mime]:blob})]);
         copyBtn.textContent="✅";
+        afrToast("📋 Image copied to clipboard");
         setTimeout(()=>copyBtn.textContent="📋",1500);
       }catch(e){
         copyBtn.textContent="❌";
@@ -511,6 +512,7 @@ function downloadFile(f){
     const a=document.createElement("a");
     a.href=url; a.download=f.name||"download"; a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
+    afrToast("⬇ Saved "+(f.name||"file"));
   }catch(e){ showError("Download failed. Try again."); }
 }
 
@@ -571,6 +573,47 @@ function finishOnboarding(){
   });
   document.querySelector(".ext-footer").style.display = "";
 }
+
+// ── Micro-interaction helpers (toast, ripple, count-up, paste-to-convert) ──
+let afrToastTimer=null;
+function afrToast(msg){
+  const el=document.getElementById("afrToast");
+  if(!el) return;
+  el.textContent=msg;
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  clearTimeout(afrToastTimer);
+  afrToastTimer=setTimeout(()=>el.classList.remove("show"),1800);
+}
+function afrCountUp(el,target,suffix){
+  if(!el) return;
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || target<2){ el.textContent=target+suffix; return; }
+  const start=performance.now(), dur=450;
+  const tick=now=>{
+    const t=Math.min((now-start)/dur,1);
+    el.textContent=Math.round(target*(1-Math.pow(1-t,3)))+suffix;
+    if(t<1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+document.addEventListener("click",e=>{
+  const btn=e.target.closest(".btn-convert,.btn-tool-ext,.btn-pp-generate,.btn-zip,.btn-again,.btn-onboard-start,.btn-dl,.btn-copy,.btn-copy-ext");
+  if(!btn||btn.disabled) return;
+  const r=btn.getBoundingClientRect(), dot=document.createElement("span");
+  dot.className="afr-ripple";
+  dot.style.left=(e.clientX-r.left)+"px"; dot.style.top=(e.clientY-r.top)+"px";
+  btn.appendChild(dot);
+  setTimeout(()=>dot.remove(),520);
+});
+// Paste a screenshot or file (Ctrl+V) straight into the Convert tab
+document.addEventListener("paste",e=>{
+  const convertTab=document.getElementById("tab-convert");
+  if(!convertTab||!convertTab.classList.contains("active")||uploadSection.style.display==="none") return;
+  const file=e.clipboardData&&e.clipboardData.files&&e.clipboardData.files[0];
+  if(!file) return;
+  e.preventDefault();
+  setFile(file);
+  if(selectedFile===file) afrToast("📋 Pasted "+(file.name||"image"));
+});
 
 // ── Init ──
 detectCurrentPortal();
@@ -812,6 +855,7 @@ initOnboarding();
     try {
       await navigator.clipboard.writeText(textAreaExt.value);
       btnCopyExt.textContent = "✅ Copied!";
+      afrToast("📋 Text copied to clipboard");
       setTimeout(() => btnCopyExt.textContent = "📋 Copy", 1500);
     } catch(e) {
       textAreaExt.select();
