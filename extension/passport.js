@@ -316,6 +316,14 @@ function renderHistory(){
   list.innerHTML = "";
   cleanExpiredHistory();
 
+  function ago(ts){
+    const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
+    if(m < 1) return "Just now";
+    if(m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60);
+    return h < 24 ? `${h} h ago` : new Date(ts).toLocaleDateString("en-IN");
+  }
+
   chrome.storage.local.get(["conversionHistory","conversionFiles"], data => {
     const history = data.conversionHistory || [];
     const files = data.conversionFiles || {};
@@ -326,69 +334,74 @@ function renderHistory(){
       empty.className = "history-empty";
       const icon = document.createElement("span");
       icon.textContent = "📂";
-      empty.append(icon, document.createTextNode("No conversions yet."), document.createElement("br"), document.createTextNode("Files stored here for 24 hours."));
+      const go = document.createElement("button");
+      go.className = "btn-go"; go.type = "button"; go.textContent = "Convert a file →";
+      go.addEventListener("click", () => { const t = document.querySelector('.tab-btn[data-tab="convert"]'); if(t) t.click(); });
+      empty.append(icon, document.createTextNode("No conversions yet."), document.createElement("br"),
+                   document.createTextNode("Converted files appear here for 24 hours."), document.createElement("br"), go);
       list.appendChild(empty);
       clearBtn.style.display = "none";
       return;
     }
     clearBtn.style.display = "block";
 
-    history.forEach(item => {
-      const timeLeft = item.expiresAt - now;
-      const hoursLeft = Math.max(0, Math.floor(timeLeft / 3600000));
-      const minsLeft = Math.max(0, Math.floor((timeLeft % 3600000) / 60000));
-      const timeStr = new Date(item.timestamp).toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit"});
-      const dateStr = new Date(item.timestamp).toLocaleDateString("en-IN");
+    history.forEach((item, idx) => {
+      const timeLeft = Math.max(0, item.expiresAt - now);
+      const hoursLeft = Math.floor(timeLeft / 3600000);
+      const minsLeft = Math.floor((timeLeft % 3600000) / 60000);
+      const pct = Math.max(2, Math.min(100, (timeLeft / HISTORY_EXPIRY_MS) * 100));
       const ext = (item.filename||"").split(".").pop().toLowerCase();
-      const icon = ext==="pdf"?"📋":["jpg","jpeg"].includes(ext)?"📷":ext==="png"?"🖼️":"📄";
+      const icon = ext==="pdf"?"📋":["jpg","jpeg"].includes(ext)?"📷":ext==="png"?"🖼️":ext==="docx"?"📝":"📄";
       const itemFiles = files[item.id] || [];
 
-      const div = document.createElement("div");
-      div.className = "history-item";
-      div.style.cssText = "cursor:default;margin-bottom:8px";
+      const card = document.createElement("div");
+      card.className = "hi-card";
+      card.style.animationDelay = (idx * 0.05) + "s";
 
-      // Header row
-      const header = document.createElement("div");
-      header.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
-      const iconEl = document.createElement("span");
-      iconEl.className = "hi-icon";
-      iconEl.textContent = icon;
-      const info = document.createElement("div");
-      info.className = "hi-info";
-      const name = document.createElement("div");
-      name.className = "hi-name";
-      name.textContent = item.filename || "Unnamed file";
-      const meta = document.createElement("div");
-      meta.className = "hi-meta";
-      meta.textContent = `${dateStr} ${timeStr} · ⏳ ${hoursLeft}h ${minsLeft}m left`;
+      const top = document.createElement("div"); top.className = "hi-top";
+      const iconEl = document.createElement("span"); iconEl.className = "hi-icon"; iconEl.textContent = icon;
+      const info = document.createElement("div"); info.className = "hi-info";
+      const name = document.createElement("div"); name.className = "hi-name"; name.textContent = item.filename || "Unnamed file"; name.title = item.filename || "";
+      const meta = document.createElement("div"); meta.className = "hi-meta";
+      meta.textContent = `${ago(item.timestamp)} · ${item.fileCount} files`;
       info.append(name, meta);
-      const count = document.createElement("span");
-      count.className = "hi-count";
-      count.textContent = `${item.fileCount} files`;
-      header.append(iconEl, info, count);
-      div.appendChild(header);
+      const del = document.createElement("button");
+      del.className = "hi-del"; del.type = "button"; del.title = "Delete this entry"; del.setAttribute("aria-label", "Delete this entry"); del.textContent = "✕";
+      del.addEventListener("click", () => {
+        card.style.transition = "opacity .2s, transform .2s"; card.style.opacity = "0"; card.style.transform = "translateX(12px)";
+        setTimeout(() => {
+          chrome.storage.local.get(["conversionHistory","conversionFiles"], d => {
+            const h = (d.conversionHistory || []).filter(x => x.id !== item.id);
+            const f = d.conversionFiles || {}; delete f[item.id];
+            chrome.storage.local.set({ conversionHistory: h, conversionFiles: f }, () => renderHistory());
+          });
+        }, 190);
+      });
+      top.append(iconEl, info, del);
+      card.appendChild(top);
 
-      // File download buttons
+      const bar = document.createElement("div"); bar.className = "hi-bar"; bar.title = `Deleted in ${hoursLeft}h ${minsLeft}m`;
+      const fill = document.createElement("span"); fill.style.width = pct + "%"; bar.appendChild(fill);
+      card.appendChild(bar);
+
       if(itemFiles.length > 0){
-        const btnWrap = document.createElement("div");
-        btnWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:4px";
+        const wrap = document.createElement("div"); wrap.className = "hi-files";
         itemFiles.forEach(f => {
           const btn = document.createElement("button");
-          btn.style.cssText = "background:var(--brand-light);color:var(--brand);border:1px solid #BFDBFE;border-radius:4px;padding:3px 7px;font-size:.64rem;font-weight:700;cursor:pointer";
-          btn.textContent = `⬇ ${f.format} ${f.size_kb}KB`;
-          btn.title = f.label;
+          btn.className = "hi-dl"; btn.type = "button";
+          btn.dataset.fmt = (f.format || "").toUpperCase();
+          btn.textContent = `⬇ ${f.format} · ${f.size_kb} KB`;
+          btn.title = f.label || f.name;
           btn.addEventListener("click", () => redownloadFile(f));
-          btnWrap.appendChild(btn);
+          wrap.appendChild(btn);
         });
-        div.appendChild(btnWrap);
+        card.appendChild(wrap);
       } else {
-        const note = document.createElement("div");
-        note.style.cssText = "font-size:.66rem;color:var(--gray-400);padding:2px 0";
+        const note = document.createElement("div"); note.className = "hi-nofiles";
         note.textContent = "Files not available — storage limit reached";
-        div.appendChild(note);
+        card.appendChild(note);
       }
-
-      list.appendChild(div);
+      list.appendChild(card);
     });
   });
 }
@@ -405,6 +418,7 @@ function redownloadFile(f){
     const a=document.createElement("a");
     a.href=url; a.download=f.name; a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
+    if(typeof afrToast==="function") afrToast("⬇ Saved "+f.name);
   }catch(e){ alert("Download failed. File may have expired."); }
 }
 

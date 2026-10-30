@@ -977,6 +977,27 @@
     .btn-dl-text{flex:1;padding:7px;background:var(--brand);color:#fff;border:none;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer}
     .btn-dl-text:hover{background:var(--brand-dark)}
 
+
+    /* Extra tools: form fields, chips, mask canvas */
+    .tool-card-wide{grid-column:1/-1}
+    .tf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .tf-field{display:flex;flex-direction:column;gap:3px;font-size:.68rem;font-weight:600;color:var(--gray-500);min-width:0}
+    .tf-field input,.tf-field select,.tf-select{width:100%;padding:7px 8px;border:1px solid var(--gray-200);border-radius:7px;font-size:.78rem;color:var(--gray-700);background:#fff;font-family:inherit}
+    .tf-field input:focus,.tf-field select:focus,.tf-select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+    .tf-chips{display:flex;flex-wrap:wrap;gap:5px}
+    .tf-chip,.tf-btn{background:var(--gray-100);border:1px solid var(--gray-200);border-radius:6px;padding:4px 9px;font-size:.7rem;font-weight:600;color:var(--gray-700);cursor:pointer;font-family:inherit;transition:all .15s}
+    .tf-chip:hover,.tf-btn:hover:not(:disabled){background:var(--brand-light);border-color:var(--brand);color:var(--brand)}
+    .tf-btn:disabled{opacity:.45;cursor:not-allowed}
+    .tf-note{font-size:.68rem;color:var(--gray-500);line-height:1.45}
+    .tf-warn{display:none;background:#FFF7ED;border:1px solid #FED7AA;color:#92400E;border-radius:7px;padding:7px 9px;font-size:.72rem;line-height:1.4}
+    .tf-warn.show{display:block}
+    .tf-preview{display:block;max-width:100%;max-height:160px;margin:0 auto 8px;border:1px solid var(--gray-200);border-radius:6px;background:#fff}
+    .mk-stage{display:none;border:1px solid var(--gray-200);border-radius:8px;padding:8px;text-align:center;background:var(--gray-50)}
+    .mk-stage.show{display:block}
+    .mk-canvas{max-width:100%;height:auto;max-height:520px;cursor:crosshair;touch-action:none;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+    .mk-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .mk-bar .tf-select{width:auto}
+
     /* Tool progress */
     .tool-progress{display:none;margin-top:8px}
     .tool-progress.show{display:block}
@@ -1216,7 +1237,7 @@
 <section class="tools-section">
   <div class="tools-header">
     <div class="tools-title">🛠️ More Free Tools</div>
-    <div class="tools-sub">PDF merge and text extraction — no sign-up, processed on the server</div>
+    <div class="tools-sub">PDF, photo and privacy tools — no sign-up needed</div>
   </div>
   <div class="tools-grid">
 
@@ -1268,54 +1289,104 @@
       <button class="btn-tool btn-tool-blue" id="btnExtractText" disabled>Extract Text →</button>
     </div>
 
+    <!-- PDF Organizer -->
+    <div class="tool-card" id="orgCard">
+      <div class="tool-card-title">🗂️ PDF Organizer</div>
+      <div class="tool-card-desc">Extract or split pages, reorder, rotate, or shrink a PDF to a target size.</div>
+      <div class="tool-drop" id="orgDropZone">
+        <input type="file" id="orgFileInput" accept=".pdf,application/pdf"/>
+        <span class="tool-drop-icon">🗂️</span>
+        <div class="tool-drop-text" id="orgDropText">Drop a PDF here</div>
+        <div class="tool-drop-sub">Single PDF · Max 10MB</div>
+      </div>
+      <label class="tf-field">Pages to keep, in order
+        <input type="text" id="orgPages" placeholder="e.g. 1-3,5 or 3,1,2 (blank = all)" autocomplete="off"/>
+      </label>
+      <div class="tf-grid">
+        <label class="tf-field">Rotate
+          <select id="orgRotate"><option value="0">None</option><option value="90">90° right</option><option value="180">180°</option><option value="270">90° left</option></select>
+        </label>
+        <label class="tf-field">Max size (KB)
+          <input type="number" id="orgTarget" min="20" max="10240" placeholder="Optional"/>
+        </label>
+      </div>
+      <div class="tool-progress" id="orgProgress">
+        <div class="tool-progress-bar"><div class="tool-progress-fill" id="orgFill"></div></div>
+        <div class="tool-progress-label" id="orgLabel">Working…</div>
+      </div>
+      <div class="tf-warn" id="orgWarn"></div>
+      <div class="tool-result" id="orgResult">
+        <div class="tool-result-title">✅ PDF ready</div>
+        <div class="tool-result-meta" id="orgMeta"></div>
+        <button class="btn-tool-dl" id="btnOrgDl">⬇ Download PDF</button>
+      </div>
+      <button class="btn-tool btn-tool-blue" id="btnOrganize" disabled>Create PDF →</button>
+    </div>
+
+    <!-- Photo & Signature Resizer (runs in the browser) -->
+    <div class="tool-card" id="rsCard">
+      <div class="tool-card-title">📐 Photo &amp; Signature Resizer</div>
+      <div class="tool-card-desc">Hit exact KB and pixel limits for exam and job forms. Runs in your browser — nothing is uploaded.</div>
+      <div class="tool-drop" id="rsDropZone">
+        <input type="file" id="rsFileInput" accept="image/jpeg,image/png,image/webp"/>
+        <span class="tool-drop-icon">🖼️</span>
+        <div class="tool-drop-text" id="rsDropText">Drop a photo or signature</div>
+        <div class="tool-drop-sub">JPG, PNG, WebP · Max 10MB</div>
+      </div>
+      <label class="tf-field">Preset
+        <select id="rsPreset"></select>
+      </label>
+      <div class="tf-grid">
+        <label class="tf-field">Width (px)<input type="number" id="rsW" min="20" max="5000" placeholder="Auto"/></label>
+        <label class="tf-field">Height (px)<input type="number" id="rsH" min="20" max="5000" placeholder="Auto"/></label>
+        <label class="tf-field">Min size (KB)<input type="number" id="rsMin" min="0" max="10240" placeholder="None"/></label>
+        <label class="tf-field">Max size (KB)<input type="number" id="rsMax" min="2" max="10240" placeholder="None"/></label>
+      </div>
+      <label class="tf-field">If the shape differs
+        <select id="rsFit"><option value="crop">Crop to fill</option><option value="pad">Fit on white</option></select>
+      </label>
+      <div class="tf-chips" id="rsQuick">
+        <button type="button" class="tf-chip" data-kb="20">Under 20 KB</button>
+        <button type="button" class="tf-chip" data-kb="50">Under 50 KB</button>
+        <button type="button" class="tf-chip" data-kb="100">Under 100 KB</button>
+        <button type="button" class="tf-chip" data-kb="200">Under 200 KB</button>
+        <button type="button" class="tf-chip" data-kb="500">Under 500 KB</button>
+      </div>
+      <div class="tf-note">Presets are typical values. Always check your form's latest notification and edit the fields if it differs.</div>
+      <div class="tf-warn" id="rsWarn"></div>
+      <div class="tool-result" id="rsResult">
+        <img id="rsPreview" class="tf-preview" alt="Resized preview"/>
+        <div class="tool-result-title">✅ Ready</div>
+        <div class="tool-result-meta" id="rsMeta"></div>
+        <button class="btn-tool-dl" id="btnRsDl">⬇ Download JPG</button>
+      </div>
+      <button class="btn-tool btn-tool-blue" id="btnResize" disabled>Resize &amp; compress →</button>
+    </div>
+
+    <!-- Mask / Blur Tool (runs in the browser) -->
+    <div class="tool-card tool-card-wide" id="mkCard">
+      <div class="tool-card-title">🛡️ Mask Sensitive Info</div>
+      <div class="tool-card-desc">Hide Aadhaar, PAN or account numbers on a photo or scan before you share it. Runs in your browser — nothing is uploaded.</div>
+      <div class="tool-drop" id="mkDropZone">
+        <input type="file" id="mkFileInput" accept="image/jpeg,image/png,image/webp"/>
+        <span class="tool-drop-icon">🛡️</span>
+        <div class="tool-drop-text" id="mkDropText">Drop an image of your document</div>
+        <div class="tool-drop-sub">JPG, PNG, WebP · Max 10MB</div>
+      </div>
+      <div class="mk-stage" id="mkStage"><canvas id="mkCanvas" class="mk-canvas"></canvas></div>
+      <div class="tf-note" id="mkHint">Drag over the numbers to hide them. Black box is safest; pixelate can sometimes be partly reversed on small text.</div>
+      <div class="mk-bar">
+        <select id="mkMode" class="tf-select" aria-label="Mask style"><option value="box">⬛ Black box</option><option value="pixel">🔳 Pixelate</option></select>
+        <button type="button" class="tf-btn" id="btnMkUndo" disabled>↩ Undo</button>
+        <button type="button" class="tf-btn" id="btnMkClear" disabled>Clear</button>
+        <span class="tf-note" id="mkCount"></span>
+      </div>
+      <button class="btn-tool btn-tool-green" id="btnMkDl" disabled>⬇ Download masked image</button>
+    </div>
+
   </div>
 </section>
 
-
-<!-- How to use -->
-<section class="how-section" id="how-to-use">
-  <div class="how-title">How to use AllFormatsReady</div>
-  <div class="how-steps">
-    <div class="how-step">
-      <div class="how-step-num">1</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Upload your document</div>
-        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, DOCX, JPG, PNG, WebP, HEIC — up to 10MB.</div>
-        <span class="how-step-tip">💡 Works with Aadhaar, PAN, Passport, certificates, and any image</span>
-      </div>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">2</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Click "Generate All Formats"</div>
-            <div class="how-step-desc">All versions are created simultaneously — compressed PDF, JPG size targets, PNG, WebP, and DOCX output. Takes 5-15 seconds.</div>
-      </div>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">3</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Choose your portal (optional)</div>
-        <div class="how-step-desc">Click EPFO, Bank KYC, UIDAI or any portal — the right format gets highlighted at top automatically.</div>
-        <span class="how-step-tip">💡 12 Indian government and banking portals supported</span>
-      </div>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">4</div>
-      <div class="how-step-content">
-        <div class="how-step-title">Download only what you need</div>
-        <div class="how-step-desc">Click any individual file card to download just that format. Or use "Download All as ZIP" to get everything at once.</div>
-      </div>
-    </div>
-    <div class="how-step" style="border-color:#BFDBFE;background:#EFF6FF">
-      <div class="how-step-num" style="background:#1D4ED8">🧩</div>
-      <div class="how-step-content">
-        <div class="how-step-title" style="color:#1E40AF">Pro tip — Use the Chrome Extension!</div>
-        <div class="how-step-desc" style="color:#3B82F6">Install our Chrome Extension v4 — convert documents while filling any form without switching tabs. Auto-detects 30+ portals. Includes a Passport Photo generator and conversion history!</div>
-        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ ⬇ Download Extension v4 Free →</a>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- Passport Photo Tool -->
 <section class="pp-section" id="passport-photo">
@@ -1418,6 +1489,51 @@
           <div style="font-size:2.5rem;margin-bottom:10px">🖼️</div>
           <div style="font-size:.84rem">Upload a photo to get started.<br>Crop preview will appear here.</div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How to use -->
+<section class="how-section" id="how-to-use">
+  <div class="how-title">How to use AllFormatsReady</div>
+  <div class="how-steps">
+    <div class="how-step">
+      <div class="how-step-num">1</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Upload your document</div>
+        <div class="how-step-desc">Drag and drop or click to browse. Supports PDF, DOCX, JPG, PNG, WebP, HEIC — up to 10MB.</div>
+        <span class="how-step-tip">💡 Works with Aadhaar, PAN, Passport, certificates, and any image</span>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">2</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Click "Generate All Formats"</div>
+            <div class="how-step-desc">All versions are created simultaneously — compressed PDF, JPG size targets, PNG, WebP, and DOCX output. Takes 5-15 seconds.</div>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">3</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Choose your portal (optional)</div>
+        <div class="how-step-desc">Click EPFO, Bank KYC, UIDAI or any portal — the right format gets highlighted at top automatically.</div>
+        <span class="how-step-tip">💡 12 Indian government and banking portals supported</span>
+      </div>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">4</div>
+      <div class="how-step-content">
+        <div class="how-step-title">Download only what you need</div>
+        <div class="how-step-desc">Click any individual file card to download just that format. Or use "Download All as ZIP" to get everything at once.</div>
+      </div>
+    </div>
+    <div class="how-step" style="border-color:#BFDBFE;background:#EFF6FF">
+      <div class="how-step-num" style="background:#1D4ED8">🧩</div>
+      <div class="how-step-content">
+        <div class="how-step-title" style="color:#1E40AF">Pro tip — Use the Chrome Extension!</div>
+        <div class="how-step-desc" style="color:#3B82F6">Install our Chrome Extension v4 — convert documents while filling any form without switching tabs. Auto-detects 30+ portals. Includes a Passport Photo generator and conversion history!</div>
+        <a href="https://github.com/MOHITH-KVS/allformatsready/releases" target="_blank" style="display:inline-block;margin-top:4px;background:#1D4ED8;color:#fff;font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:8px;text-decoration:none">⬇ ⬇ Download Extension v4 Free →</a>
       </div>
     </div>
   </div>
@@ -2309,5 +2425,313 @@
 </div>
 
 
+<script>
+// ══════════════════════════════════════════
+// Extra tools: PDF Organizer (server) · Photo/Signature Resizer + Mask tool (in-browser)
+// Wrapped in an IIFE so nothing here can collide with the other script blocks.
+// ══════════════════════════════════════════
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const MAX_BYTES = 10 * 1024 * 1024;
+
+  function loadImage(file){
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read this image. Use JPG, PNG or WebP.")); };
+      img.src = url;
+    });
+  }
+  function toJpegBlob(canvas, q){ return new Promise(res => canvas.toBlob(b => res(b), "image/jpeg", q)); }
+  function saveBlob(blob, name){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function baseName(n){ return (n || "image").replace(/\.[^.]+$/, "").replace(/[^\w\-]+/g, "_") || "image"; }
+  function isImageFile(f){ return /^image\/(jpeg|png|webp)$/.test(f.type) || /\.(jpe?g|png|webp)$/i.test(f.name); }
+  function showWarn(el, msg){ el.textContent = msg ? "⚠️ " + msg : ""; el.classList.toggle("show", !!msg); }
+
+  // ───────── Photo & Signature Resizer ─────────
+  const PRESETS = [
+    {g:"General", label:"Custom size", w:0, h:0, min:0, max:0},
+    {g:"SSC", label:"SSC — Photo", w:100, h:120, min:20, max:50},
+    {g:"SSC", label:"SSC — Signature", w:140, h:60, min:10, max:20},
+    {g:"Banking (IBPS / SBI)", label:"Photo", w:200, h:230, min:20, max:50},
+    {g:"Banking (IBPS / SBI)", label:"Signature", w:140, h:60, min:10, max:20},
+    {g:"Banking (IBPS / SBI)", label:"Left thumb impression", w:240, h:240, min:20, max:50},
+    {g:"Banking (IBPS / SBI)", label:"Handwritten declaration", w:800, h:400, min:50, max:100},
+    {g:"NEET / JEE (NTA)", label:"Photo (size only)", w:0, h:0, min:10, max:200},
+    {g:"NEET / JEE (NTA)", label:"Signature (size only)", w:0, h:0, min:4, max:30}
+  ];
+  const rsDrop = $("rsFileInput"), rsPreset = $("rsPreset"), rsW = $("rsW"), rsH = $("rsH"),
+        rsMin = $("rsMin"), rsMax = $("rsMax"), rsFit = $("rsFit"), rsWarn = $("rsWarn"),
+        rsResult = $("rsResult"), rsPreview = $("rsPreview"), rsMeta = $("rsMeta"),
+        btnResize = $("btnResize"), btnRsDl = $("btnRsDl");
+  let rsImg = null, rsName = "image", rsBlob = null, rsPreviewUrl = null;
+
+  (function buildPresetSelect(){
+    let group = null, groupName = "";
+    PRESETS.forEach((p, i) => {
+      if(p.g !== groupName){ group = document.createElement("optgroup"); group.label = p.g; rsPreset.appendChild(group); groupName = p.g; }
+      const o = document.createElement("option"); o.value = String(i); o.textContent = p.label; group.appendChild(o);
+    });
+  })();
+  function applyPreset(){
+    const p = PRESETS[+rsPreset.value] || PRESETS[0];
+    rsW.value = p.w || ""; rsH.value = p.h || ""; rsMin.value = p.min || ""; rsMax.value = p.max || "";
+  }
+  rsPreset.addEventListener("change", applyPreset);
+  [rsW, rsH, rsMin, rsMax].forEach(el => el.addEventListener("input", () => { rsPreset.value = "0"; }));
+  $("rsQuick").addEventListener("click", e => {
+    const chip = e.target.closest(".tf-chip"); if(!chip) return;
+    rsPreset.value = "0"; rsW.value = ""; rsH.value = ""; rsMin.value = ""; rsMax.value = chip.dataset.kb;
+  });
+
+  rsDrop.addEventListener("change", async () => {
+    const f = rsDrop.files[0];
+    rsResult.classList.remove("show"); showWarn(rsWarn, ""); btnResize.disabled = true; rsImg = null;
+    if(!f) return;
+    if(!isImageFile(f)){ showWarn(rsWarn, "Please choose a JPG, PNG or WebP image."); rsDrop.value = ""; return; }
+    if(f.size > MAX_BYTES){ showWarn(rsWarn, "File is larger than 10MB."); rsDrop.value = ""; return; }
+    try {
+      rsImg = await loadImage(f); rsName = baseName(f.name);
+      $("rsDropText").textContent = "🖼️ " + f.name; btnResize.disabled = false;
+    } catch(err){ showWarn(rsWarn, err.message); }
+  });
+
+  function drawTo(src, w, h, fit){
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, w, h);
+    x.imageSmoothingQuality = "high";
+    const sw = src.width, sh = src.height;
+    if(fit === "crop"){
+      const sr = sw / sh, dr = w / h;
+      let cw, ch, cx, cy;
+      if(sr > dr){ ch = sh; cw = ch * dr; cx = (sw - cw) / 2; cy = 0; } else { cw = sw; ch = cw / dr; cx = 0; cy = (sh - ch) / 2; }
+      x.drawImage(src, cx, cy, cw, ch, 0, 0, w, h);
+    } else {
+      const s = Math.min(w / sw, h / sh), dw = sw * s, dh = sh * s;
+      x.drawImage(src, 0, 0, sw, sh, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    }
+    return c;
+  }
+  async function fitToMax(canvas, maxBytes){
+    const top = await toJpegBlob(canvas, 0.95);
+    if(top.size <= maxBytes) return {blob: top, fits: true};
+    let lo = 0.05, hi = 0.95, best = null;
+    for(let i = 0; i < 8; i++){
+      const mid = (lo + hi) / 2, b = await toJpegBlob(canvas, mid);
+      if(b.size <= maxBytes){ best = b; lo = mid; } else { hi = mid; }
+    }
+    if(best) return {blob: best, fits: true};
+    const floor = await toJpegBlob(canvas, 0.05);
+    return {blob: floor, fits: floor.size <= maxBytes};
+  }
+
+  // Pad a JPEG with inert comment (COM) segments so it reaches a required minimum size.
+  // Decoders ignore these bytes; the picture itself is unchanged.
+  async function padJpeg(blob, targetBytes){
+    const src = new Uint8Array(await blob.arrayBuffer());
+    let need = targetBytes - src.length;
+    if(need <= 4 || src[0] !== 0xFF || src[1] !== 0xD8) return blob;
+    let pos = 2;
+    if(src[2] === 0xFF && src[3] === 0xE0) pos = 4 + ((src[4] << 8) | src[5]);   // keep JFIF header first
+    const parts = [src.subarray(0, pos)];
+    while(need > 4){
+      const n = Math.min(need - 4, 65533);
+      const seg = new Uint8Array(n + 4).fill(0x20);
+      seg[0] = 0xFF; seg[1] = 0xFE; seg[2] = ((n + 2) >> 8) & 255; seg[3] = (n + 2) & 255;
+      parts.push(seg); need -= n + 4;
+    }
+    parts.push(src.subarray(pos));
+    return new Blob(parts, {type: "image/jpeg"});
+  }
+
+  btnResize.addEventListener("click", async () => {
+    if(!rsImg) return;
+    const w = Math.round(+rsW.value) || 0, h = Math.round(+rsH.value) || 0;
+    const minKB = +rsMin.value || 0, maxKB = +rsMax.value || 0;
+    showWarn(rsWarn, ""); rsResult.classList.remove("show");
+    if((w && !h) || (!w && h)){ showWarn(rsWarn, "Enter both width and height, or leave both empty to keep the shape."); return; }
+    if(w > 5000 || h > 5000){ showWarn(rsWarn, "Maximum dimension is 5000 px."); return; }
+    if(minKB && maxKB && minKB > maxKB){ showWarn(rsWarn, "Minimum size cannot be larger than maximum size."); return; }
+    btnResize.disabled = true; btnResize.textContent = "Working…";
+    try {
+      const fixed = w > 0 && h > 0;
+      let canvas;
+      if(fixed){ canvas = drawTo(rsImg, w, h, rsFit.value); }
+      else {
+        const s = Math.min(1, 2400 / Math.max(rsImg.width, rsImg.height));
+        canvas = drawTo(rsImg, Math.round(rsImg.width * s), Math.round(rsImg.height * s), "pad");
+      }
+      let res;
+      if(!maxKB){ res = {blob: await toJpegBlob(canvas, 0.92), fits: true}; }
+      else {
+        res = await fitToMax(canvas, maxKB * 1024);
+        while(!res.fits && !fixed && Math.min(canvas.width, canvas.height) > 60){
+          canvas = drawTo(canvas, Math.round(canvas.width * 0.85), Math.round(canvas.height * 0.85), "pad");
+          res = await fitToMax(canvas, maxKB * 1024);
+        }
+      }
+      let padded = false;
+      if(res.fits && minKB && res.blob.size < minKB * 1024){
+        const goal = Math.min(minKB * 1024 + 512, maxKB ? maxKB * 1024 : Infinity);
+        if(goal >= minKB * 1024){ res.blob = await padJpeg(res.blob, goal); padded = true; }
+      }
+      rsBlob = res.blob;
+      if(rsPreviewUrl) URL.revokeObjectURL(rsPreviewUrl);
+      rsPreviewUrl = URL.createObjectURL(rsBlob); rsPreview.src = rsPreviewUrl;
+      const kb = rsBlob.size / 1024;
+      let status = "";
+      if(!res.fits){ showWarn(rsWarn, `Could not get under ${maxKB} KB at ${canvas.width}×${canvas.height} px. Try a simpler photo, or relax the pixel size if the form allows.`); status = "⚠️ over the limit"; }
+      else if(minKB && kb < minKB){ showWarn(rsWarn, `File is ${kb.toFixed(1)} KB, below the ${minKB} KB minimum.`); status = "⚠️ below the minimum"; }
+      else if(minKB || maxKB){ status = `✅ within ${minKB || 0}–${maxKB || "any"} KB` + (padded ? " (padded with harmless metadata to meet the minimum)" : ""); }
+      rsMeta.textContent = `${canvas.width}×${canvas.height} px · ${kb.toFixed(1)} KB${status ? " · " + status : ""}`;
+      rsResult.classList.add("show");
+    } catch(err){ showWarn(rsWarn, err.message || "Could not process this image."); }
+    btnResize.disabled = false; btnResize.textContent = "Resize & compress →";
+  });
+  btnRsDl.addEventListener("click", () => { if(rsBlob) saveBlob(rsBlob, rsName + "_resized.jpg"); });
+
+  // ───────── Mask Sensitive Info ─────────
+  const mkInput = $("mkFileInput"), mkCanvas = $("mkCanvas"), mkCtx = mkCanvas.getContext("2d"),
+        mkStage = $("mkStage"), mkMode = $("mkMode"), btnUndo = $("btnMkUndo"), btnClear = $("btnMkClear"),
+        btnMkDl = $("btnMkDl"), mkCount = $("mkCount");
+  let mkBase = null, mkRects = [], mkDrag = null, mkName = "image";
+
+  function mkApply(r){
+    if(r.mode === "box"){ mkCtx.fillStyle = "#000"; mkCtx.fillRect(r.x, r.y, r.w, r.h); return; }
+    const block = Math.max(10, Math.round(Math.max(mkCanvas.width, mkCanvas.height) / 60));
+    const sw = Math.max(1, Math.ceil(r.w / block)), sh = Math.max(1, Math.ceil(r.h / block));
+    const tmp = document.createElement("canvas"); tmp.width = sw; tmp.height = sh;
+    tmp.getContext("2d").drawImage(mkBase, r.x, r.y, r.w, r.h, 0, 0, sw, sh);
+    mkCtx.imageSmoothingEnabled = false;
+    mkCtx.drawImage(tmp, 0, 0, sw, sh, r.x, r.y, r.w, r.h);
+    mkCtx.imageSmoothingEnabled = true;
+  }
+  function mkDraw(){
+    if(!mkBase) return;
+    mkCtx.drawImage(mkBase, 0, 0);
+    mkRects.forEach(mkApply);
+    if(mkDrag){
+      mkCtx.save(); mkCtx.strokeStyle = "#2563EB"; mkCtx.lineWidth = Math.max(2, mkCanvas.width / 400);
+      mkCtx.setLineDash([8, 6]); mkCtx.strokeRect(mkDrag.x, mkDrag.y, mkDrag.w, mkDrag.h); mkCtx.restore();
+    }
+    btnUndo.disabled = btnClear.disabled = mkRects.length === 0;
+    btnMkDl.disabled = false;
+    mkCount.textContent = mkRects.length ? `${mkRects.length} area${mkRects.length > 1 ? "s" : ""} hidden` : "No areas hidden yet";
+  }
+  mkInput.addEventListener("change", async () => {
+    const f = mkInput.files[0]; if(!f) return;
+    if(!isImageFile(f)){ alert("⚠️ Please choose a JPG, PNG or WebP image."); mkInput.value = ""; return; }
+    if(f.size > MAX_BYTES){ alert("⚠️ File is larger than 10MB."); mkInput.value = ""; return; }
+    try {
+      const img = await loadImage(f);
+      const s = Math.min(1, 2400 / Math.max(img.width, img.height));
+      mkBase = document.createElement("canvas");
+      mkBase.width = mkCanvas.width = Math.round(img.width * s);
+      mkBase.height = mkCanvas.height = Math.round(img.height * s);
+      mkBase.getContext("2d").drawImage(img, 0, 0, mkBase.width, mkBase.height);
+      mkRects = []; mkDrag = null; mkName = baseName(f.name);
+      $("mkDropText").textContent = "🛡️ " + f.name;
+      mkStage.classList.add("show"); mkDraw();
+    } catch(err){ alert("⚠️ " + err.message); }
+  });
+  function mkPoint(e){
+    const r = mkCanvas.getBoundingClientRect();
+    return {x: Math.min(Math.max((e.clientX - r.left) * mkCanvas.width / r.width, 0), mkCanvas.width),
+            y: Math.min(Math.max((e.clientY - r.top) * mkCanvas.height / r.height, 0), mkCanvas.height)};
+  }
+  let mkStart = null;
+  mkCanvas.addEventListener("pointerdown", e => {
+    if(!mkBase) return;
+    mkStart = mkPoint(e); mkDrag = {x: mkStart.x, y: mkStart.y, w: 0, h: 0};
+    mkCanvas.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  mkCanvas.addEventListener("pointermove", e => {
+    if(!mkStart) return;
+    const p = mkPoint(e);
+    mkDrag = {x: Math.min(mkStart.x, p.x), y: Math.min(mkStart.y, p.y), w: Math.abs(p.x - mkStart.x), h: Math.abs(p.y - mkStart.y)};
+    mkDraw();
+  });
+  function mkFinish(commit){
+    if(!mkStart) return;
+    const min = Math.max(6, mkCanvas.width / 150);
+    if(commit && mkDrag && mkDrag.w >= min && mkDrag.h >= min){
+      mkRects.push({x: Math.round(mkDrag.x), y: Math.round(mkDrag.y), w: Math.round(mkDrag.w), h: Math.round(mkDrag.h), mode: mkMode.value});
+    }
+    mkStart = null; mkDrag = null; mkDraw();
+  }
+  mkCanvas.addEventListener("pointerup", () => mkFinish(true));
+  mkCanvas.addEventListener("pointercancel", () => mkFinish(false));
+  btnUndo.addEventListener("click", () => { mkRects.pop(); mkDraw(); });
+  btnClear.addEventListener("click", () => { mkRects = []; mkDraw(); });
+  btnMkDl.addEventListener("click", async () => {
+    if(!mkBase) return;
+    mkDrag = null; mkDraw();
+    const blob = await toJpegBlob(mkCanvas, 0.92);
+    if(blob) saveBlob(blob, mkName + "_masked.jpg");
+  });
+
+  // ───────── PDF Organizer (server: /organize-pdf) ─────────
+  const orgInput = $("orgFileInput"), btnOrg = $("btnOrganize"), orgWarn = $("orgWarn"),
+        orgProgress = $("orgProgress"), orgFill = $("orgFill"), orgLabel = $("orgLabel"),
+        orgResult = $("orgResult"), orgMeta = $("orgMeta");
+  let orgFile = null, orgB64 = "", orgName = "organized";
+
+  orgInput.addEventListener("change", () => {
+    const f = orgInput.files[0];
+    orgResult.classList.remove("show"); showWarn(orgWarn, ""); btnOrg.disabled = true; orgFile = null;
+    if(!f) return;
+    if(!/\.pdf$/i.test(f.name) && f.type !== "application/pdf"){ showWarn(orgWarn, "Please choose a PDF file."); orgInput.value = ""; return; }
+    if(f.size > MAX_BYTES){ showWarn(orgWarn, "File is larger than 10MB."); orgInput.value = ""; return; }
+    orgFile = f; orgName = baseName(f.name);
+    $("orgDropText").textContent = "📄 " + f.name; btnOrg.disabled = false;
+  });
+  btnOrg.addEventListener("click", async () => {
+    if(!orgFile) return;
+    const target = Math.round(+$("orgTarget").value) || 0;
+    if(target && (target < 20 || target > 10240)){ showWarn(orgWarn, "Max size must be between 20 and 10240 KB."); return; }
+    showWarn(orgWarn, ""); orgResult.classList.remove("show");
+    btnOrg.disabled = true; orgProgress.classList.add("show"); orgFill.style.width = "35%";
+    orgLabel.textContent = target ? "Optimizing to target size…" : "Working…";
+    try {
+      const fd = new FormData();
+      fd.append("file", orgFile);
+      fd.append("pages", $("orgPages").value.trim());
+      fd.append("rotate", $("orgRotate").value);
+      fd.append("target_kb", String(target));
+      orgFill.style.width = "65%";
+      const res = await fetch(`${API_URL}/organize-pdf`, { method: "POST", body: fd });
+      orgFill.style.width = "90%";
+      if(!res.ok){
+        const e = await res.json().catch(() => ({}));
+        throw new Error(apiErrorMessage(e, "Could not process this PDF."));
+      }
+      const data = await res.json();
+      if(!data || typeof data.pdf !== "string") throw new Error("Server returned an invalid response.");
+      orgB64 = data.pdf; orgFill.style.width = "100%";
+      orgMeta.textContent = `${data.pages} page${data.pages === 1 ? "" : "s"} · ${data.size_kb} KB`;
+      if(data.notice) showWarn(orgWarn, data.notice);
+      setTimeout(() => { orgProgress.classList.remove("show"); orgResult.classList.add("show"); btnOrg.disabled = false; }, 300);
+    } catch(err){
+      orgProgress.classList.remove("show"); btnOrg.disabled = false;
+      showWarn(orgWarn, err.message || "Could not process this PDF. Try again.");
+    }
+  });
+  $("btnOrgDl").addEventListener("click", () => {
+    if(!orgB64) return;
+    const bin = atob(orgB64), bytes = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    saveBlob(new Blob([bytes], {type: "application/pdf"}), orgName + "_organized.pdf");
+  });
+})();
+</script>
 </body>
 </html>

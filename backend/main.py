@@ -8,7 +8,7 @@ import shutil
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -1073,6 +1073,123 @@ async def merge_pdf(request: Request, files: list[UploadFile] = File(...)):
         })
     finally:
         merger.close()
+
+
+# ══════════════════════════════════════════════
+# PDF Organizer: extract / reorder / rotate / shrink to a target size
+# ══════════════════════════════════════════════
+def parse_page_spec(spec: str, page_count: int) -> list:
+    """'1-3,5' / '3,1,2' / '2-last' → zero-based page indexes, order kept. Blank = all pages."""
+    spec = (spec or "").strip().lower().replace(" ", "")
+    if not spec:
+        return list(range(page_count))
+    def num(token):
+        if token in ("last", "end"):
+            return page_count
+        if not token.isdigit():
+            raise InvalidUploadError(f"'{token}' is not a valid page number. Use something like 1-3,5.")
+        value = int(token)
+        if value < 1 or value > page_count:
+            raise InvalidUploadError(f"Page {value} does not exist. This PDF has {page_count} page(s).")
+        return value
+    order = []
+    for part in spec.split(","):
+        if not part:
+            continue
+        if "-" in part:
+            bits = part.split("-")
+            if len(bits) != 2:
+                raise InvalidUploadError(f"'{part}' is not a valid range. Use something like 2-5.")
+            start, end = num(bits[0]), num(bits[1])
+            step = 1 if end >= start else -1
+            order.extend(range(start - 1, end - 1 + step, step))
+        else:
+            order.append(num(part) - 1)
+        if len(order) > MAX_PDF_PAGES:
+            raise InvalidUploadError(f"Too many pages selected. Maximum is {MAX_PDF_PAGES}.")
+    if not order:
+        raise InvalidUploadError("No pages selected.")
+    return order
+
+
+def shrink_pdf_to_target(doc, limit_bytes: int):
+    """Re-render pages as JPEG at falling quality until the PDF fits limit_bytes. Returns (bytes, fits)."""
+    data = b""
+    for dpi, quality in ((150, 70), (120, 60), (100, 50), (80, 40), (72, 30), (60, 25)):
+        out = fitz_mod.open()
+        try:
+            zoom = dpi / 72.0
+            for page in doc:
+                pix = page.get_pixmap(matrix=fitz_mod.Matrix(zoom, zoom), alpha=False)
+                jpg = pix.tobytes("jpeg", jpg_quality=quality)
+                new_page = out.new_page(width=page.rect.width, height=page.rect.height)
+                new_page.insert_image(new_page.rect, stream=jpg)
+                pix = None
+            buf = io.BytesIO()
+            out.save(buf, garbage=4, deflate=True)
+            data = buf.getvalue()
+        finally:
+            out.close()
+        if len(data) <= limit_bytes:
+            return data, True
+    return data, False
+
+
+@app.post("/organize-pdf")
+@limiter.limit("5/minute")
+async def organize_pdf(
+    request: Request,
+    file: UploadFile = File(...),
+    pages: str = Form(""),
+    rotate: int = Form(0),
+    target_kb: int = Form(0),
+):
+    """Pick/reorder pages, rotate them, and optionally shrink the PDF to a target size in KB."""
+    load_libs()
+    try:
+        file_bytes = await read_upload(file)
+        if not file_bytes.startswith(b"%PDF-"):
+            raise InvalidUploadError("Please upload a PDF file.")
+        if rotate not in (0, 90, 180, 270):
+            raise InvalidUploadError("Rotation must be 0, 90, 180 or 270 degrees.")
+        if target_kb and not (20 <= target_kb <= 10240):
+            raise InvalidUploadError("Target size must be between 20 KB and 10240 KB.")
+        doc = open_pdf(file_bytes)
+        try:
+            doc.select(parse_page_spec(pages, doc.page_count))
+            if rotate:
+                for page in doc:
+                    page.set_rotation((page.rotation + rotate) % 360)
+            buf = io.BytesIO()
+            doc.save(buf, garbage=4, deflate=True, deflate_images=True, deflate_fonts=True, clean=True)
+            out_bytes = buf.getvalue()
+            notice = None
+            if target_kb and len(out_bytes) > target_kb * 1024:
+                out_bytes, fits = shrink_pdf_to_target(doc, target_kb * 1024)
+                if fits:
+                    notice = "To reach the target size, pages were converted to images, so text can no longer be selected."
+                else:
+                    notice = (f"Could not reach {target_kb} KB. The smallest version is {round(len(out_bytes) / 1024)} KB "
+                              "(pages converted to images).")
+            page_total = doc.page_count
+        finally:
+            doc.close()
+        out_bytes = validate_pdf_bytes(ensure_output(out_bytes, "PDF organize"))
+        return JSONResponse(content={
+            "pdf": base64.b64encode(out_bytes).decode(),
+            "size_kb": round(len(out_bytes) / 1024, 1),
+            "pages": page_total,
+            "notice": notice,
+        })
+    except InvalidUploadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("PDF organize failed")
+        raise HTTPException(status_code=422, detail="Could not process this PDF.") from exc
+    finally:
+        await file.close()
 
 
 # ══════════════════════════════════════════════

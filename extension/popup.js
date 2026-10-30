@@ -615,6 +615,116 @@ document.addEventListener("paste",e=>{
   if(selectedFile===file) afrToast("📋 Pasted "+(file.name||"image"));
 });
 
+// ── Custom-size compressor (Convert tab) + sliding tab indicator ──
+(function(){
+  const $ = id => document.getElementById(id);
+  const kbEl = $("csKb"), wEl = $("csW"), hEl = $("csH"), btn = $("btnCompress"), msg = $("csMsg"), dlBtn = $("btnCsDl");
+  if(!kbEl || !btn) return;
+  let outBlob = null, outName = "";
+
+  function say(text, kind){ msg.textContent = text; msg.className = "cs-msg show " + kind; }
+  function clearOut(){ outBlob = null; dlBtn.classList.remove("show"); msg.className = "cs-msg"; }
+  function loadImg(file){
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("Could not read this image.")); };
+      img.src = url;
+    });
+  }
+  const jpeg = (c, q) => new Promise(r => c.toBlob(b => r(b), "image/jpeg", q));
+  function drawTo(src, w, h, crop){
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.imageSmoothingQuality = "high";
+    const sw = src.width, sh = src.height;
+    if(crop){
+      const sr = sw / sh, dr = w / h; let cw, ch, cx, cy;
+      if(sr > dr){ ch = sh; cw = ch * dr; cx = (sw - cw) / 2; cy = 0; } else { cw = sw; ch = cw / dr; cx = 0; cy = (sh - ch) / 2; }
+      x.drawImage(src, cx, cy, cw, ch, 0, 0, w, h);
+    } else { x.drawImage(src, 0, 0, w, h); }
+    return c;
+  }
+  async function fitToMax(c, maxBytes){
+    const top = await jpeg(c, 0.95); if(top.size <= maxBytes) return {blob: top, fits: true};
+    let lo = 0.05, hi = 0.95, best = null;
+    for(let i = 0; i < 8; i++){ const mid = (lo + hi) / 2, b = await jpeg(c, mid); if(b.size <= maxBytes){ best = b; lo = mid; } else hi = mid; }
+    if(best) return {blob: best, fits: true};
+    const floor = await jpeg(c, 0.05); return {blob: floor, fits: floor.size <= maxBytes};
+  }
+  function setBusy(on){ btn.classList.toggle("is-loading", on); btn.disabled = on; btn.textContent = on ? "Compressing…" : "Compress to custom size →"; }
+  const base = n => (n || "file").replace(/\.[^.]+$/, "").replace(/[^\w\-]+/g, "_") || "file";
+
+  $("csChips").addEventListener("click", e => {
+    const chip = e.target.closest(".cs-chip"); if(!chip) return;
+    kbEl.value = chip.dataset.kb;
+    document.querySelectorAll(".cs-chip").forEach(c => c.classList.toggle("on", c === chip));
+  });
+  kbEl.addEventListener("input", () => document.querySelectorAll(".cs-chip").forEach(c => c.classList.toggle("on", c.dataset.kb === kbEl.value)));
+
+  btn.addEventListener("click", async () => {
+    clearOut();
+    if(!selectedFile){ say("Choose a file above first.", "err"); return; }
+    const kb = Math.round(+kbEl.value) || 0, w = Math.round(+wEl.value) || 0, h = Math.round(+hEl.value) || 0;
+    if(!kb && !(w && h)){ say("Enter a max size in KB, or both width and height.", "err"); return; }
+    if(kb && (kb < 5 || kb > 10240)){ say("Max size must be between 5 and 10240 KB.", "err"); return; }
+    if((w && !h) || (!w && h)){ say("Enter both width and height, or leave both empty.", "err"); return; }
+    if(w > 5000 || h > 5000){ say("Maximum dimension is 5000 px.", "err"); return; }
+    const ext = selectedFile.name.split(".").pop().toLowerCase();
+    setBusy(true);
+    try{
+      if(["jpg","jpeg","png","webp"].includes(ext)){
+        const img = await loadImg(selectedFile);
+        const fixed = w && h;
+        let c = fixed ? drawTo(img, w, h, true)
+                      : (s => drawTo(img, Math.round(img.width * s), Math.round(img.height * s), false))(Math.min(1, 2400 / Math.max(img.width, img.height)));
+        let res = kb ? await fitToMax(c, kb * 1024) : {blob: await jpeg(c, 0.92), fits: true};
+        while(kb && !res.fits && !fixed && Math.min(c.width, c.height) > 60){
+          c = drawTo(c, Math.round(c.width * 0.85), Math.round(c.height * 0.85), false);
+          res = await fitToMax(c, kb * 1024);
+        }
+        outBlob = res.blob; outName = base(selectedFile.name) + "_compressed.jpg";
+        const size = (outBlob.size / 1024).toFixed(1);
+        if(res.fits) say(`✅ ${c.width}×${c.height} px · ${size} KB`, "ok");
+        else say(`Could not get under ${kb} KB at ${c.width}×${c.height} px (got ${size} KB). Try a simpler image or larger pixel size.`, "err");
+      } else if(ext === "pdf"){
+        if(!kb){ say("For PDFs, enter a max size in KB.", "err"); return; }
+        const fd = new FormData();
+        fd.append("file", selectedFile); fd.append("pages", ""); fd.append("rotate", "0"); fd.append("target_kb", String(kb));
+        const r = await fetch(`${API_URL}/organize-pdf`, {method: "POST", body: fd});
+        if(!r.ok){ const e = await r.json().catch(() => ({})); throw new Error(typeof e.detail === "string" ? e.detail : "Could not compress this PDF."); }
+        const d = await r.json();
+        const bin = atob(d.pdf), bytes = new Uint8Array(bin.length);
+        for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        outBlob = new Blob([bytes], {type: "application/pdf"}); outName = base(selectedFile.name) + "_compressed.pdf";
+        say(`✅ ${d.pages} page${d.pages === 1 ? "" : "s"} · ${d.size_kb} KB` + (d.notice ? ` — ${d.notice}` : ""), d.notice ? "err" : "ok");
+      } else {
+        say("Custom size works with JPG, PNG, WebP and PDF. For DOCX or HEIC, run Generate All Formats first.", "err");
+        return;
+      }
+      if(outBlob){ dlBtn.classList.add("show"); }
+    } catch(err){ say(err.message || "Something went wrong. Try again.", "err"); }
+    finally{ setBusy(false); }
+  });
+  dlBtn.addEventListener("click", () => {
+    if(!outBlob) return;
+    const url = URL.createObjectURL(outBlob), a = document.createElement("a");
+    a.href = url; a.download = outName; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    afrToast("⬇ Saved " + outName);
+  });
+  fileInput.addEventListener("change", clearOut);
+
+  // Sliding tab indicator
+  const bar = $("tabBar"), ind = $("tabInd");
+  function moveInd(){
+    const active = bar && bar.querySelector(".tab-btn.active");
+    if(!active || !ind) return;
+    ind.style.width = active.offsetWidth + "px";
+    ind.style.transform = `translateX(${active.offsetLeft}px)`;
+  }
+  if(bar){ bar.addEventListener("click", () => requestAnimationFrame(moveInd)); window.addEventListener("resize", moveInd); requestAnimationFrame(moveInd); setTimeout(moveInd, 250); }
+})();
+
 // ── Init ──
 detectCurrentPortal();
 checkServer();
