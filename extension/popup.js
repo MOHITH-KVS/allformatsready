@@ -576,11 +576,11 @@ function finishOnboarding(){
 
 // ── Micro-interaction helpers (toast, ripple, count-up, paste-to-convert) ──
 let afrToastTimer=null;
-function afrToast(msg){
+function afrToast(msg,type){
   const el=document.getElementById("afrToast");
   if(!el) return;
   el.textContent=msg;
-  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  el.className="afr-toast"+(type?" "+type:""); void el.offsetWidth; el.classList.add("show");
   clearTimeout(afrToastTimer);
   afrToastTimer=setTimeout(()=>el.classList.remove("show"),1800);
 }
@@ -717,12 +717,191 @@ document.addEventListener("paste",e=>{
   // Sliding tab indicator
   const bar = $("tabBar"), ind = $("tabInd");
   function moveInd(){
-    const active = bar && bar.querySelector(".tab-btn.active");
+    let active = bar && bar.querySelector(".tab-btn.active");
     if(!active || !ind) return;
+    const parent = bar.querySelector('.tab-btn[data-tab="tools"]');
+    bar.querySelectorAll(".active-parent").forEach(b => b.classList.remove("active-parent"));
+    if(active.classList.contains("sub") && parent){ parent.classList.add("active-parent"); active = parent; }
     ind.style.width = active.offsetWidth + "px";
     ind.style.transform = `translateX(${active.offsetLeft}px)`;
   }
   if(bar){ bar.addEventListener("click", () => requestAnimationFrame(moveInd)); window.addEventListener("resize", moveInd); requestAnimationFrame(moveInd); setTimeout(moveInd, 250); }
+})();
+
+// ── Success celebration (confetti burst) ──
+function afrCelebrate(){
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const colors=["#2563EB","#16A34A","#F59E0B","#EC4899","#8B5CF6","#06B6D4"];
+  const cx=window.innerWidth/2, cy=110;
+  for(let i=0;i<18;i++){
+    const p=document.createElement("span"); p.className="afr-confetti";
+    const a=Math.random()*Math.PI*2, d=60+Math.random()*90;
+    p.style.left=cx+"px"; p.style.top=cy+"px"; p.style.background=colors[i%colors.length];
+    p.style.setProperty("--dx",Math.cos(a)*d+"px"); p.style.setProperty("--dy",(Math.sin(a)*d+40)+"px"); p.style.setProperty("--rot",(Math.random()*540-270)+"deg");
+    document.body.appendChild(p); setTimeout(()=>p.remove(),1000);
+  }
+}
+
+// ── Tools hub, PDF Organizer, Photo & Signature Resizer, Mask ──
+(function(){
+  const $=id=>document.getElementById(id);
+  const MAXB=10*1024*1024;
+  const go=tab=>{ const b=document.querySelector('.tab-btn[data-tab="'+tab+'"]'); if(b) b.click(); };
+  const base=n=>(n||"file").replace(/\.[^.]+$/,"").replace(/[^\w\-]+/g,"_")||"file";
+  const isImg=f=>/^image\/(jpeg|png|webp)$/.test(f.type)||/\.(jpe?g|png|webp)$/i.test(f.name);
+  const say=(el,text,kind)=>{ el.textContent=text; el.className="cs-msg show "+kind; };
+  function save(blob,name){ const u=URL.createObjectURL(blob),a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1000); afrToast("⬇ Saved "+name,"ok"); }
+  function loadImg(file){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file),i=new Image(); i.onload=()=>{URL.revokeObjectURL(u);res(i)}; i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("Could not read this image."))}; i.src=u; }); }
+  const jpeg=(c,q)=>new Promise(r=>c.toBlob(b=>r(b),"image/jpeg",q));
+
+  // Tiles and back buttons
+  document.querySelectorAll(".tl-tile").forEach(t=>t.addEventListener("click",()=>go(t.dataset.go)));
+  ["merge","textex","organizer","resizer","mask"].forEach(id=>{
+    const p=$("tab-"+id); if(!p) return;
+    const b=document.createElement("button"); b.type="button"; b.className="tool-back"; b.textContent="← All tools";
+    b.addEventListener("click",()=>go("tools")); p.insertBefore(b,p.firstChild);
+  });
+
+  // ───── PDF Organizer (server) ─────
+  const orgIn=$("orgInExt"), btnOrg=$("btnOrgExt"), orgMsg=$("orgMsgExt"), orgDl=$("btnOrgDlExt");
+  let orgFile=null, orgBlob=null, orgName="organized";
+  orgIn.addEventListener("change",()=>{
+    const f=orgIn.files[0]; orgBlob=null; orgDl.classList.remove("show"); orgMsg.className="cs-msg"; btnOrg.disabled=true; orgFile=null;
+    if(!f) return;
+    if(!/\.pdf$/i.test(f.name)&&f.type!=="application/pdf"){ say(orgMsg,"Please choose a PDF file.","err"); orgIn.value=""; return; }
+    if(f.size>MAXB){ say(orgMsg,"File is larger than 10MB.","err"); orgIn.value=""; return; }
+    orgFile=f; orgName=base(f.name); $("orgDropTextExt").textContent="📄 "+f.name; btnOrg.disabled=false;
+  });
+  btnOrg.addEventListener("click",async()=>{
+    if(!orgFile) return;
+    const kb=Math.round(+$("orgKbExt").value)||0;
+    if(kb&&(kb<20||kb>10240)){ say(orgMsg,"Max size must be between 20 and 10240 KB.","err"); return; }
+    orgDl.classList.remove("show"); orgMsg.className="cs-msg"; btnOrg.disabled=true; btnOrg.classList.add("is-loading"); btnOrg.textContent="Working…";
+    try{
+      const fd=new FormData(); fd.append("file",orgFile); fd.append("pages",$("orgPagesExt").value.trim()); fd.append("rotate",$("orgRotExt").value); fd.append("target_kb",String(kb));
+      const r=await fetch(`${API_URL}/organize-pdf`,{method:"POST",body:fd});
+      if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"Could not process this PDF."); }
+      const d=await r.json(); const bin=atob(d.pdf), bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      orgBlob=new Blob([bytes],{type:"application/pdf"});
+      say(orgMsg,`✅ ${d.pages} page${d.pages===1?"":"s"} · ${d.size_kb} KB`+(d.notice?` — ${d.notice}`:""),d.notice?"err":"ok");
+      orgDl.classList.add("show"); afrToast("✅ PDF ready","ok"); afrCelebrate();
+    }catch(err){ say(orgMsg,err.message||"Could not process this PDF. Try again.","err"); }
+    finally{ btnOrg.disabled=false; btnOrg.classList.remove("is-loading"); btnOrg.textContent="Create PDF →"; }
+  });
+  orgDl.addEventListener("click",()=>{ if(orgBlob) save(orgBlob,orgName+"_organized.pdf"); });
+
+  // ───── Photo & Signature Resizer (on device) ─────
+  const PRES=[["Custom size",0,0,0,0],["SSC — Photo",100,120,20,50],["SSC — Signature",140,60,10,20],["IBPS / SBI — Photo",200,230,20,50],["IBPS / SBI — Signature",140,60,10,20],["IBPS — Left thumb",240,240,20,50],["IBPS — Declaration",800,400,50,100],["NEET / JEE — Photo (size only)",0,0,10,200],["NEET / JEE — Signature (size only)",0,0,4,30]];
+  const rsIn=$("rsInExt"), rsPreset=$("rsPresetExt"), rsW=$("rsWExt"), rsH=$("rsHExt"), rsMin=$("rsMinExt"), rsMax=$("rsMaxExt"), rsFit=$("rsFitExt"),
+        rsMsg=$("rsMsgExt"), rsPrev=$("rsPrevExt"), btnRs=$("btnRsExt"), rsDl=$("btnRsDlExt");
+  let rsImg=null, rsName="image", rsBlob=null, rsUrl=null;
+  PRES.forEach((p,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=p[0]; rsPreset.appendChild(o); });
+  rsPreset.addEventListener("change",()=>{ const p=PRES[+rsPreset.value]; rsW.value=p[1]||""; rsH.value=p[2]||""; rsMin.value=p[3]||""; rsMax.value=p[4]||""; });
+  [rsW,rsH,rsMin,rsMax].forEach(el=>el.addEventListener("input",()=>{ rsPreset.value="0"; }));
+  rsIn.addEventListener("change",async()=>{
+    const f=rsIn.files[0]; rsBlob=null; rsDl.classList.remove("show"); rsPrev.classList.remove("show"); rsMsg.className="cs-msg"; btnRs.disabled=true; rsImg=null;
+    if(!f) return;
+    if(!isImg(f)){ say(rsMsg,"Please choose a JPG, PNG or WebP image.","err"); rsIn.value=""; return; }
+    if(f.size>MAXB){ say(rsMsg,"File is larger than 10MB.","err"); rsIn.value=""; return; }
+    try{ rsImg=await loadImg(f); rsName=base(f.name); $("rsDropTextExt").textContent="🖼️ "+f.name; btnRs.disabled=false; }catch(e){ say(rsMsg,e.message,"err"); }
+  });
+  function drawTo(src,w,h,crop){
+    const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,w,h); x.imageSmoothingQuality="high";
+    const sw=src.width, sh=src.height;
+    if(crop){ const sr=sw/sh, dr=w/h; let cw,ch,cx,cy; if(sr>dr){ch=sh;cw=ch*dr;cx=(sw-cw)/2;cy=0}else{cw=sw;ch=cw/dr;cx=0;cy=(sh-ch)/2} x.drawImage(src,cx,cy,cw,ch,0,0,w,h); }
+    else{ const s=Math.min(w/sw,h/sh), dw=sw*s, dh=sh*s; x.drawImage(src,0,0,sw,sh,(w-dw)/2,(h-dh)/2,dw,dh); }
+    return c;
+  }
+  async function fitToMax(c,maxBytes){
+    const top=await jpeg(c,0.95); if(top.size<=maxBytes) return {blob:top,fits:true};
+    let lo=0.05,hi=0.95,best=null;
+    for(let i=0;i<8;i++){ const mid=(lo+hi)/2, b=await jpeg(c,mid); if(b.size<=maxBytes){best=b;lo=mid}else hi=mid; }
+    if(best) return {blob:best,fits:true};
+    const floor=await jpeg(c,0.05); return {blob:floor,fits:floor.size<=maxBytes};
+  }
+  async function padJpeg(blob,target){
+    const src=new Uint8Array(await blob.arrayBuffer()); let need=target-src.length;
+    if(need<=4||src[0]!==0xFF||src[1]!==0xD8) return blob;
+    let pos=2; if(src[2]===0xFF&&src[3]===0xE0) pos=4+((src[4]<<8)|src[5]);
+    const parts=[src.subarray(0,pos)];
+    while(need>4){ const n=Math.min(need-4,65533), seg=new Uint8Array(n+4).fill(0x20); seg[0]=0xFF; seg[1]=0xFE; seg[2]=((n+2)>>8)&255; seg[3]=(n+2)&255; parts.push(seg); need-=n+4; }
+    parts.push(src.subarray(pos)); return new Blob(parts,{type:"image/jpeg"});
+  }
+  btnRs.addEventListener("click",async()=>{
+    if(!rsImg) return;
+    const w=Math.round(+rsW.value)||0, h=Math.round(+rsH.value)||0, minKB=+rsMin.value||0, maxKB=+rsMax.value||0;
+    rsMsg.className="cs-msg"; rsDl.classList.remove("show"); rsPrev.classList.remove("show");
+    if((w&&!h)||(!w&&h)){ say(rsMsg,"Enter both width and height, or leave both empty.","err"); return; }
+    if(w>5000||h>5000){ say(rsMsg,"Maximum dimension is 5000 px.","err"); return; }
+    if(minKB&&maxKB&&minKB>maxKB){ say(rsMsg,"Minimum size cannot be larger than maximum.","err"); return; }
+    btnRs.disabled=true; btnRs.classList.add("is-loading"); btnRs.textContent="Working…";
+    try{
+      const fixed=w&&h; let c;
+      if(fixed) c=drawTo(rsImg,w,h,rsFit.value==="crop");
+      else{ const s=Math.min(1,2400/Math.max(rsImg.width,rsImg.height)); c=drawTo(rsImg,Math.round(rsImg.width*s),Math.round(rsImg.height*s),false); }
+      let res=maxKB?await fitToMax(c,maxKB*1024):{blob:await jpeg(c,0.92),fits:true};
+      while(maxKB&&!res.fits&&!fixed&&Math.min(c.width,c.height)>60){ c=drawTo(c,Math.round(c.width*.85),Math.round(c.height*.85),false); res=await fitToMax(c,maxKB*1024); }
+      let padded=false;
+      if(res.fits&&minKB&&res.blob.size<minKB*1024){ const goal=Math.min(minKB*1024+512,maxKB?maxKB*1024:Infinity); if(goal>=minKB*1024){ res.blob=await padJpeg(res.blob,goal); padded=true; } }
+      rsBlob=res.blob; if(rsUrl) URL.revokeObjectURL(rsUrl); rsUrl=URL.createObjectURL(rsBlob); rsPrev.src=rsUrl; rsPrev.classList.add("show");
+      const kb=rsBlob.size/1024;
+      if(!res.fits) say(rsMsg,`Could not get under ${maxKB} KB at ${c.width}×${c.height} px (got ${kb.toFixed(1)} KB).`,"err");
+      else if(minKB&&kb<minKB) say(rsMsg,`File is ${kb.toFixed(1)} KB, below the ${minKB} KB minimum.`,"err");
+      else { say(rsMsg,`✅ ${c.width}×${c.height} px · ${kb.toFixed(1)} KB`+(padded?" (padded with harmless metadata to meet the minimum)":""),"ok"); afrToast("✅ Resized to "+kb.toFixed(1)+" KB","ok"); afrCelebrate(); }
+      rsDl.classList.add("show");
+    }catch(err){ say(rsMsg,err.message||"Could not process this image.","err"); }
+    finally{ btnRs.disabled=false; btnRs.classList.remove("is-loading"); btnRs.textContent="Resize & compress →"; }
+  });
+  rsDl.addEventListener("click",()=>{ if(rsBlob) save(rsBlob,rsName+"_resized.jpg"); });
+
+  // ───── Mask Sensitive Info (manual, on device) ─────
+  const mkIn=$("mkInExt"), mkC=$("mkCanvasExt"), mkX=mkC.getContext("2d"), mkStage=$("mkStageExt"), mkHint=$("mkHintExt"),
+        mkMode=$("mkModeExt"), btnUndo=$("btnMkUndoExt"), btnClear=$("btnMkClearExt"), btnMkDl=$("btnMkDlExt");
+  let mkBase=null, mkRects=[], mkDrag=null, mkStart=null, mkName="image";
+  function apply(r){
+    if(r.mode==="box"){ mkX.fillStyle="#000"; mkX.fillRect(r.x,r.y,r.w,r.h); return; }
+    const blk=Math.max(10,Math.round(Math.max(mkC.width,mkC.height)/60)), sw=Math.max(1,Math.ceil(r.w/blk)), sh=Math.max(1,Math.ceil(r.h/blk));
+    const t=document.createElement("canvas"); t.width=sw; t.height=sh; t.getContext("2d").drawImage(mkBase,r.x,r.y,r.w,r.h,0,0,sw,sh);
+    mkX.imageSmoothingEnabled=false; mkX.drawImage(t,0,0,sw,sh,r.x,r.y,r.w,r.h); mkX.imageSmoothingEnabled=true;
+  }
+  function draw(){
+    if(!mkBase) return;
+    mkX.drawImage(mkBase,0,0); mkRects.forEach(apply);
+    if(mkDrag){ mkX.save(); mkX.strokeStyle="#2563EB"; mkX.lineWidth=Math.max(2,mkC.width/300); mkX.setLineDash([8,6]); mkX.strokeRect(mkDrag.x,mkDrag.y,mkDrag.w,mkDrag.h); mkX.restore(); }
+    btnUndo.disabled=btnClear.disabled=mkRects.length===0; btnMkDl.disabled=mkRects.length===0;
+    btnMkDl.title=mkRects.length?"":"Cover at least one area first";
+    if(mkRects.length){ mkHint.className="cs-msg show ok"; mkHint.textContent=`✅ ${mkRects.length} area${mkRects.length>1?"s":""} hidden. Check the preview, then download.`; }
+    else { mkHint.className="cs-msg show todo"; mkHint.textContent="👆 Nothing hidden yet. Drag over the PAN or Aadhaar number. Download unlocks after you cover one area."; }
+  }
+  mkIn.addEventListener("change",async()=>{
+    const f=mkIn.files[0]; if(!f) return;
+    if(!isImg(f)){ say(mkHint,"Please choose a JPG, PNG or WebP image.","err"); mkIn.value=""; return; }
+    if(f.size>MAXB){ say(mkHint,"File is larger than 10MB.","err"); mkIn.value=""; return; }
+    try{
+      const img=await loadImg(f), s=Math.min(1,2000/Math.max(img.width,img.height));
+      mkBase=document.createElement("canvas"); mkBase.width=mkC.width=Math.round(img.width*s); mkBase.height=mkC.height=Math.round(img.height*s);
+      mkBase.getContext("2d").drawImage(img,0,0,mkBase.width,mkBase.height);
+      mkRects=[]; mkDrag=null; mkName=base(f.name); $("mkDropTextExt").textContent="🛡️ "+f.name; mkStage.classList.add("show"); draw();
+    }catch(e){ say(mkHint,e.message,"err"); }
+  });
+  const pt=e=>{ const r=mkC.getBoundingClientRect(); return {x:Math.min(Math.max((e.clientX-r.left)*mkC.width/r.width,0),mkC.width), y:Math.min(Math.max((e.clientY-r.top)*mkC.height/r.height,0),mkC.height)}; };
+  mkC.addEventListener("pointerdown",e=>{ if(!mkBase) return; mkStart=pt(e); mkDrag={x:mkStart.x,y:mkStart.y,w:0,h:0}; mkC.setPointerCapture(e.pointerId); e.preventDefault(); });
+  mkC.addEventListener("pointermove",e=>{ if(!mkStart) return; const p=pt(e); mkDrag={x:Math.min(mkStart.x,p.x),y:Math.min(mkStart.y,p.y),w:Math.abs(p.x-mkStart.x),h:Math.abs(p.y-mkStart.y)}; draw(); });
+  function finish(commit){
+    if(!mkStart) return; const min=Math.max(6,mkC.width/150);
+    if(commit&&mkDrag&&mkDrag.w>=min&&mkDrag.h>=min){ mkRects.push({x:Math.round(mkDrag.x),y:Math.round(mkDrag.y),w:Math.round(mkDrag.w),h:Math.round(mkDrag.h),mode:mkMode.value}); afrToast("🛡️ Area hidden","ok"); }
+    mkStart=null; mkDrag=null; draw();
+  }
+  mkC.addEventListener("pointerup",()=>finish(true)); mkC.addEventListener("pointercancel",()=>finish(false));
+  btnUndo.addEventListener("click",()=>{ mkRects.pop(); draw(); }); btnClear.addEventListener("click",()=>{ mkRects=[]; draw(); });
+  btnMkDl.addEventListener("click",async()=>{ if(!mkBase||!mkRects.length) return; mkDrag=null; draw(); const b=await jpeg(mkC,0.92); if(b){ save(b,mkName+"_masked.jpg"); afrCelebrate(); } });
+
+  // ───── Success feedback for every result panel ─────
+  function watch(el,fn){ if(!el) return; let on=el.classList.contains("show"); new MutationObserver(()=>{ const now=el.classList.contains("show"); if(now&&!on) fn(el); on=now; }).observe(el,{attributes:true,attributeFilter:["class"]}); }
+  document.querySelectorAll(".tool-result-ext").forEach(el=>watch(el,e=>{ afrToast(((e.querySelector(".tool-result-title")||{}).textContent||"✅ Done").trim(),"ok"); afrCelebrate(); }));
+  watch($("resultsWrap"),()=>{ afrToast("🎉 "+allFiles.length+" formats ready. Pick what you need.","ok"); afrCelebrate(); });
+  watch($("btnCsDl"),()=>afrToast("✅ Compressed. Tap download.","ok"));
+  document.addEventListener("change",e=>{ const i=e.target; if(i&&i.type==="file"&&i.files&&i.files.length&&i.id!=="fileInput") afrToast(i.files.length>1?`✅ ${i.files.length} files added`:`✅ ${i.files[0].name} added`,"ok"); });
 })();
 
 // ── Init ──
