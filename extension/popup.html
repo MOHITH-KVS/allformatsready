@@ -423,6 +423,12 @@
     .tl-share-btn:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 4px 10px rgba(0,0,0,.15)}
     .tl-share-btn:active{transform:scale(.96)}
     .tl-share-btn.wa{background:#25D366}.tl-share-btn.li{background:#0A66C2}
+    /* Success states */
+    @keyframes afrBtnOk{0%{transform:scale(.92)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
+    .btn-ok{background:#16A34A !important;color:#fff !important;border-color:#16A34A !important;animation:afrBtnOk .35s ease}
+    .hi-dl.btn-ok{color:#fff !important}
+    #resultsWrap.show .results-title,.tool-result-ext.show .tool-result-title{animation:afrPop .45s ease}
+    @media (prefers-reduced-motion:reduce){.btn-ok{animation:none}}
     @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   </style>
 </head>

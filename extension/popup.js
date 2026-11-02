@@ -728,6 +728,19 @@ document.addEventListener("paste",e=>{
   if(bar){ bar.addEventListener("click", () => requestAnimationFrame(moveInd)); window.addEventListener("resize", moveInd); requestAnimationFrame(moveInd); setTimeout(moveInd, 250); }
 })();
 
+// ── Button success morph (✅ for a moment, then restores) ──
+function afrBtnOk(btn,label,ms){
+  if(!btn||btn.dataset.okBusy) return;
+  btn.dataset.okBusy="1"; btn.dataset.orig=btn.innerHTML; btn.innerHTML=label; btn.classList.add("btn-ok");
+  setTimeout(()=>{ btn.innerHTML=btn.dataset.orig; btn.classList.remove("btn-ok"); delete btn.dataset.okBusy; delete btn.dataset.orig; },ms||1600);
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".cs-dl,.hi-dl,.btn-dl,.btn-dl-txt,.btn-tool-dl-ext");
+  if(b&&!b.disabled) afrBtnOk(b,b.classList.contains("btn-dl")?"✓":"✅ Saved");
+  const c=e.target.closest(".btn-copy-ext");
+  if(c) afrBtnOk(c,"✅ Copied!");
+});
+
 // ── Success celebration (confetti burst) ──
 function afrCelebrate(){
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -758,9 +771,9 @@ function afrCelebrate(){
   const shareCopy=$("btnShareCopy");
   if(shareCopy) shareCopy.addEventListener("click",()=>{
     const url="https://allformatsready.vercel.app/";
-    (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>{ afrToast("🔗 Link copied. Paste it anywhere.","ok"); afrCelebrate(); }).catch(()=>afrToast("Could not copy the link.","err"));
+    (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>{ afrToast("🔗 Link copied. Paste it anywhere.","ok"); afrCelebrate(); afrBtnOk(shareCopy,"✅ Copied"); }).catch(()=>afrToast("Could not copy the link.","err"));
   });
-  document.querySelectorAll(".tl-share-btn[href]").forEach(a=>a.addEventListener("click",()=>afrToast("💬 Opening share page…","ok")));
+  document.querySelectorAll(".tl-share-btn[href]").forEach(a=>a.addEventListener("click",()=>{ afrToast("💙 Thanks for spreading the word!","ok"); afrCelebrate(); }));
 
   // Tiles and back buttons
   document.querySelectorAll(".tl-tile").forEach(t=>t.addEventListener("click",()=>go(t.dataset.go)));

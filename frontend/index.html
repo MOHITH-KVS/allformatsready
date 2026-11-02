@@ -1121,6 +1121,21 @@
     .guides-nav a{color:var(--gray-500);text-decoration:none;margin:0 8px;white-space:nowrap}
     .guides-nav a:hover{color:var(--brand);text-decoration:underline}
 
+    /* Success states + share polish */
+    .scroll-progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--brand),#60A5FA);z-index:120;transition:width .1s linear;pointer-events:none}
+    @keyframes afrBtnOk{0%{transform:scale(.92)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
+    .btn-ok{background:#16A34A !important;color:#fff !important;border-color:#16A34A !important;animation:afrBtnOk .35s ease}
+    .share-card{position:relative}
+    .share-card.copied{border-color:#22C55E;box-shadow:0 0 0 4px rgba(34,197,94,.15)}
+    .share-badge{position:absolute;top:16px;right:16px;background:#16A34A;color:#fff;font-size:.72rem;font-weight:700;border-radius:20px;padding:4px 10px;opacity:0;transform:scale(.8);transition:opacity .25s,transform .25s;pointer-events:none}
+    .share-card.copied .share-badge{opacity:1;transform:scale(1)}
+    .share-ic{transition:transform .25s ease}
+    .share-card:hover .share-ic{transform:rotate(-8deg) scale(1.1)}
+    .share-chip:active{transform:scale(.95)}
+    .tool-drop.has-file{animation:afrGlow .9s ease}
+    #resultsSection .results-title{animation:afrPopIn .5s ease}
+    @media (prefers-reduced-motion:reduce){.btn-ok,.tool-drop.has-file,#resultsSection .results-title{animation:none}.share-card:hover .share-ic{transform:none}.scroll-progress{transition:none}}
+
     /* Mask tool guidance */
     .mk-steps{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
     .mk-steps li{display:flex;align-items:center;gap:7px;font-size:.74rem;font-weight:600;color:var(--gray-600);background:var(--gray-50);border:1px solid var(--gray-200);border-radius:20px;padding:5px 11px}
@@ -1690,8 +1705,8 @@
 <section class="share-section" id="share" aria-labelledby="share-title">
   <div class="share-head">
     <div class="share-kicker">SPREAD THE WORD</div>
-    <h2 class="share-title" id="share-title">Help a friend with their next form 🤝</h2>
-    <p class="share-sub">Wrong photo sizes and "file too large" errors waste everyone's time. Share AllFormatsReady with friends, classmates and family who fill online forms.</p>
+    <h2 class="share-title" id="share-title">Share AllFormatsReady: the free fix for “file too large” errors 🚀</h2>
+    <p class="share-sub">Know someone stuck on an online form? Send them the free tool that converts Aadhaar and PAN documents, compresses PDFs, and resizes photos and signatures to exact KB. No sign-up, works in any browser.</p>
   </div>
   <div class="share-grid">
     <article class="share-card">
@@ -3015,6 +3030,11 @@
     toast.textContent = msg; toast.className = "afr-toast" + (type ? " " + type : ""); void toast.offsetWidth; toast.classList.add("show");
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
   };
+  window.afrBtnOk = function(btn, label, ms){
+    if(!btn || btn.dataset.okBusy) return;
+    btn.dataset.okBusy = "1"; btn.dataset.orig = btn.innerHTML; btn.innerHTML = label; btn.classList.add("btn-ok");
+    setTimeout(() => { btn.innerHTML = btn.dataset.orig; btn.classList.remove("btn-ok"); delete btn.dataset.okBusy; delete btn.dataset.orig; }, ms || 1700);
+  };
   window.afrCelebrate = function(){
     if(reduce) return;
     const colors = ["#2563EB", "#16A34A", "#F59E0B", "#EC4899", "#8B5CF6", "#06B6D4"];
@@ -3039,6 +3059,10 @@
     const dl = e.target.closest("#btnRsDl,#btnMkDl,#btnOrgDl,#btnMergeDl,#btnDlText");
     if(dl && !dl.disabled) window.afrToast("⬇ Download started", "ok");
     if(e.target.closest("#btnCopyText")) setTimeout(() => window.afrToast("📋 Text copied to clipboard", "ok"), 200);
+    const okBtn = e.target.closest(".btn-dl,.btn-dl-text,.btn-tool-dl");
+    if(okBtn && !okBtn.disabled) window.afrBtnOk(okBtn, "✅ Saved");
+    const cpBtn = e.target.closest("#btnCopyText");
+    if(cpBtn) window.afrBtnOk(cpBtn, "✅ Copied!");
     if(e.target.closest("#btnZip")) window.afrToast("📦 Preparing your ZIP…");
   });
 
@@ -3104,16 +3128,30 @@
   document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", () => {
     const src = document.getElementById(btn.dataset.copy); if(!src) return;
     const caption = src.textContent.trim().replace(/^"|"$/g, "") + (btn.dataset.nourl ? "" : " " + SITE_URL);
-    copyText(caption).then(() => { window.afrToast(btn.dataset.toast || "📋 Copied", "ok"); window.afrCelebrate(); })
+    const card = btn.closest(".share-card");
+    copyText(caption).then(() => {
+      window.afrToast(btn.dataset.toast || "📋 Copied", "ok"); window.afrCelebrate();
+      if(card){ card.classList.add("copied"); setTimeout(() => card.classList.remove("copied"), 2000); }
+      window.afrBtnOk(btn, btn.tagName === "A" ? "✅ Caption copied" : "✅ Copied!");
+    })
                      .catch(() => window.afrToast("Could not copy automatically. Please select the text and copy it.", "err"));
   }));
   const copyLinkBtn = document.getElementById("shCopyLink");
-  if(copyLinkBtn) copyLinkBtn.addEventListener("click", () => copyText(SITE_URL).then(() => window.afrToast("🔗 Link copied. Paste it anywhere.", "ok")).catch(() => window.afrToast("Could not copy the link.", "err")));
+  if(copyLinkBtn) copyLinkBtn.addEventListener("click", () => copyText(SITE_URL).then(() => { window.afrToast("🔗 Link copied. Paste it anywhere.", "ok"); window.afrBtnOk(copyLinkBtn, "✅ Link copied"); }).catch(() => window.afrToast("Could not copy the link.", "err")));
   const nativeBtn = document.getElementById("shNative");
   if(nativeBtn && navigator.share){
     nativeBtn.hidden = false;
     nativeBtn.addEventListener("click", () => navigator.share({title: "AllFormatsReady", text: "Free document converter for India: PDF, JPG, exact-KB photo resizer, merge PDFs.", url: SITE_URL}).catch(() => {}));
   }
+  // Friendly thanks when someone starts sharing, plus a "✓ Copied" badge on each card
+  document.querySelectorAll(".share-card").forEach(c => { const b = document.createElement("span"); b.className = "share-badge"; b.setAttribute("aria-hidden", "true"); b.textContent = "✓ Copied"; c.appendChild(b); });
+  const waBtn = document.getElementById("shWa");
+  if(waBtn) waBtn.addEventListener("click", () => { window.afrToast("💙 Thanks for spreading the word!", "ok"); window.afrCelebrate(); window.afrBtnOk(waBtn, "💙 Thanks!"); });
+  document.querySelectorAll(".share-chip[href]").forEach(a => a.addEventListener("click", () => window.afrToast("💙 Thanks for spreading the word!", "ok")));
+  // Reading progress bar
+  const prog = document.createElement("div"); prog.className = "scroll-progress"; prog.setAttribute("aria-hidden", "true"); document.body.appendChild(prog);
+  const updProg = () => { const h = document.documentElement.scrollHeight - window.innerHeight; prog.style.width = (h > 0 ? Math.min(100, window.scrollY / h * 100) : 0) + "%"; };
+  window.addEventListener("scroll", updProg, {passive: true}); updProg();
   // The "Share on WhatsApp" button in the results area also celebrates
   const resultWa = document.getElementById("btnWhatsApp");
   if(resultWa) resultWa.addEventListener("click", () => window.afrToast("💬 Opening WhatsApp…", "ok"));
