@@ -87,6 +87,7 @@ async def add_cors_headers(request: Request, call_next):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"   # the API host must never compete with the website in search
     return response
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -816,6 +817,9 @@ def image_outputs(img, prefix="", page_num=None):
 
 @app.get("/")
 def root(): return {"status": "AllFormatsReady API is live"}
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt(): return Response(content="User-agent: *\nDisallow: /\n", media_type="text/plain")
 
 @app.get("/health")
 def health(): return {"status": "ok"}

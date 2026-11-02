@@ -416,6 +416,13 @@
     .afr-confetti{position:fixed;pointer-events:none;z-index:70;width:6px;height:10px;border-radius:2px;opacity:0;animation:afrConfetti .95s ease-out forwards}
     @keyframes afrConfetti{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot))}}
     .tool-result-ext.show{animation:afrPop .3s ease}
+    .tl-share{margin-top:12px;padding:10px;background:#fff;border:1px solid var(--gray-200);border-radius:10px}
+    .tl-share-title{font-size:.72rem;font-weight:700;color:var(--gray-700);margin-bottom:8px}
+    .tl-share-row{display:flex;gap:6px}
+    .tl-share-btn{flex:1;text-align:center;text-decoration:none;border:none;border-radius:7px;padding:7px 6px;font-size:.7rem;font-weight:700;color:#fff;background:var(--gray-700);cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s,filter .15s}
+    .tl-share-btn:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 4px 10px rgba(0,0,0,.15)}
+    .tl-share-btn:active{transform:scale(.96)}
+    .tl-share-btn.wa{background:#25D366}.tl-share-btn.li{background:#0A66C2}
     @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   </style>
 </head>
@@ -478,7 +485,7 @@
 <div class="tab-bar" id="tabBar">
   <button class="tab-btn active" data-tab="convert">📄 Convert</button>
   <button class="tab-btn" data-tab="passport">🪪 Photo</button>
-  <button class="tab-btn" data-tab="tools">🧰 Tools</button>
+  <button class="tab-btn" data-tab="tools">🧰 More Tools</button>
   <button class="tab-btn" data-tab="history">🕐 History</button>
   <button class="tab-btn sub" data-tab="merge" tabindex="-1" aria-hidden="true">Merge</button>
   <button class="tab-btn sub" data-tab="textex" tabindex="-1" aria-hidden="true">Text</button>
@@ -715,13 +722,21 @@
 <!-- ═══ TOOLS HUB + PDF ORGANIZER + RESIZER + MASK ═══ -->
 <div class="tab-panel" id="tab-tools">
   <div class="tool-section">
-    <div class="tl-title">🧰 All tools</div>
+    <div class="tl-title">🧰 More Tools</div>
     <div class="tl-grid">
       <button type="button" class="tl-tile" data-go="merge"><span class="tl-ic">📎</span><b>Merge PDFs</b><small>Combine up to 10</small></button>
       <button type="button" class="tl-tile" data-go="textex"><span class="tl-ic">📝</span><b>PDF to Text</b><small>Copy or save text</small></button>
       <button type="button" class="tl-tile" data-go="organizer"><span class="tl-ic">🗂️</span><b>PDF Organizer</b><small>Reorder, rotate, shrink</small></button>
       <button type="button" class="tl-tile" data-go="resizer"><span class="tl-ic">📐</span><b>Photo &amp; Signature</b><small>Exact KB and pixels</small></button>
       <button type="button" class="tl-tile" data-go="mask"><span class="tl-ic">🛡️</span><b>Mask Sensitive Info</b><small>Hide PAN or Aadhaar numbers on an image</small></button>
+    </div>
+    <div class="tl-share">
+      <div class="tl-share-title">💬 Share with friends</div>
+      <div class="tl-share-row">
+        <a class="tl-share-btn wa" href="https://wa.me/?text=Found%20a%20free%20tool%20for%20Indian%20forms%3A%20converts%20documents%2C%20compresses%20to%20exact%20KB%2C%20merges%20PDFs%2C%20resizes%20photos%20and%20signatures.%20No%20sign-up%20%F0%9F%91%87%20https%3A%2F%2Fallformatsready.vercel.app%2F" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a class="tl-share-btn li" href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fallformatsready.vercel.app%2F" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        <button type="button" class="tl-share-btn" id="btnShareCopy">🔗 Copy link</button>
+      </div>
     </div>
   </div>
 </div>

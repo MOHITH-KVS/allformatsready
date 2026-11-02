@@ -754,11 +754,19 @@ function afrCelebrate(){
   function loadImg(file){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file),i=new Image(); i.onload=()=>{URL.revokeObjectURL(u);res(i)}; i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("Could not read this image."))}; i.src=u; }); }
   const jpeg=(c,q)=>new Promise(r=>c.toBlob(b=>r(b),"image/jpeg",q));
 
+  // Share: copy link
+  const shareCopy=$("btnShareCopy");
+  if(shareCopy) shareCopy.addEventListener("click",()=>{
+    const url="https://allformatsready.vercel.app/";
+    (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>{ afrToast("🔗 Link copied. Paste it anywhere.","ok"); afrCelebrate(); }).catch(()=>afrToast("Could not copy the link.","err"));
+  });
+  document.querySelectorAll(".tl-share-btn[href]").forEach(a=>a.addEventListener("click",()=>afrToast("💬 Opening share page…","ok")));
+
   // Tiles and back buttons
   document.querySelectorAll(".tl-tile").forEach(t=>t.addEventListener("click",()=>go(t.dataset.go)));
   ["merge","textex","organizer","resizer","mask"].forEach(id=>{
     const p=$("tab-"+id); if(!p) return;
-    const b=document.createElement("button"); b.type="button"; b.className="tool-back"; b.textContent="← All tools";
+    const b=document.createElement("button"); b.type="button"; b.className="tool-back"; b.textContent="← More Tools";
     b.addEventListener("click",()=>go("tools")); p.insertBefore(b,p.firstChild);
   });
 
