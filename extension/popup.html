@@ -497,7 +497,7 @@
   <button class="tab-btn sub" data-tab="textex" tabindex="-1" aria-hidden="true">Text</button>
   <button class="tab-btn sub" data-tab="organizer" tabindex="-1" aria-hidden="true">Organizer</button>
   <button class="tab-btn sub" data-tab="resizer" tabindex="-1" aria-hidden="true">Resizer</button>
-  <button class="tab-btn sub" data-tab="mask" tabindex="-1" aria-hidden="true">Mask</button>
+  <button class="tab-btn sub" data-tab="unlock" tabindex="-1" aria-hidden="true">Unlock</button>
   <span class="tab-ind" id="tabInd"></span>
 </div>
 
@@ -643,11 +643,13 @@
     </div>
 
     <!-- Zoom + reset controls -->
+    <div class="cs-note" id="ppFitHint">Your whole photo fits automatically. Zoom or drag to frame the face.</div>
     <div class="pp-zoom-row" id="ppZoomRow" style="display:none">
       <span class="pp-zoom-label">Zoom:</span>
-      <input type="range" class="pp-zoom-slider" id="ppZoomSlider" min="50" max="200" value="100"/>
+      <input type="range" class="pp-zoom-slider" id="ppZoomSlider" min="100" max="300" value="100"/>
       <span class="pp-zoom-val" id="ppZoomVal">100%</span>
-      <button class="pp-reset-crop" id="ppResetCrop">↺ Reset</button>
+      <button class="pp-reset-crop" id="ppResetCrop">↺ Fit all</button>
+      <button class="pp-reset-crop" id="ppFillFrame">⤢ Fill</button>
     </div>
 
     <!-- Crop canvas -->
@@ -734,7 +736,7 @@
       <button type="button" class="tl-tile" data-go="textex"><span class="tl-ic">📝</span><b>PDF to Text</b><small>Copy or save text</small></button>
       <button type="button" class="tl-tile" data-go="organizer"><span class="tl-ic">🗂️</span><b>PDF Organizer</b><small>Reorder, rotate, shrink</small></button>
       <button type="button" class="tl-tile" data-go="resizer"><span class="tl-ic">📐</span><b>Photo &amp; Signature</b><small>Exact KB and pixels</small></button>
-      <button type="button" class="tl-tile" data-go="mask"><span class="tl-ic">🛡️</span><b>Mask Sensitive Info</b><small>Hide PAN or Aadhaar numbers on an image</small></button>
+      <button type="button" class="tl-tile" data-go="unlock"><span class="tl-ic">🔓</span><b>Unlock PDF</b><small>Remove a password you know, e.g. e-Aadhaar</small></button>
     </div>
     <div class="tl-share">
       <div class="tl-share-title">💬 Share with friends</div>
@@ -792,24 +794,21 @@
   </div>
 </div>
 
-<div class="tab-panel" id="tab-mask">
+<div class="tab-panel" id="tab-unlock">
   <div class="tool-section tl-stack">
-    <div class="tool-title-ext">🛡️ Mask Sensitive Info</div>
-    <div class="tool-drop-ext" id="mkDropExt">
-      <input type="file" id="mkInExt" accept="image/jpeg,image/png,image/webp"/>
-      <span class="tool-drop-icon">🛡️</span>
-      <div class="tool-drop-text" id="mkDropTextExt">Drop an image of your document</div>
-      <div class="tool-drop-sub">JPG, PNG, WebP · Max 10MB · stays on your device</div>
+    <div class="tool-title-ext">🔓 Unlock PDF</div>
+    <div class="tool-drop-ext" id="ulDropExt">
+      <input type="file" id="ulInExt" accept=".pdf,application/pdf"/>
+      <span class="tool-drop-icon">🔓</span>
+      <div class="tool-drop-text" id="ulDropTextExt">Drop a locked PDF here</div>
+      <div class="tool-drop-sub">Single PDF · Max 10MB</div>
     </div>
-    <div class="mk-stage-ext" id="mkStageExt"><canvas id="mkCanvasExt" class="mk-canvas-ext"></canvas></div>
-    <div class="cs-msg show todo" id="mkHintExt">Drop an image, then drag over the PAN or Aadhaar number to hide it.</div>
-    <div class="mk-bar-ext">
-      <select id="mkModeExt" aria-label="Mask style"><option value="box">⬛ Black box</option><option value="pixel">🔳 Pixelate</option></select>
-      <button type="button" class="mk-btn" id="btnMkUndoExt" disabled>↩ Undo</button>
-      <button type="button" class="mk-btn" id="btnMkClearExt" disabled>Clear</button>
-    </div>
-    <button class="btn-tool-ext btn-green" id="btnMkDlExt" disabled title="Cover at least one area first">⬇ Download masked image</button>
-    <div class="cs-note">Want automatic PAN / Aadhaar detection? <a href="https://allformatsready.vercel.app/#mask-sensitive-info" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">Use it on the website →</a></div>
+    <label class="cs-field">PDF password<input type="password" id="ulPassExt" autocomplete="off" placeholder="Enter the password"/></label>
+    <div class="cs-note">e-Aadhaar: first 4 letters of your name in CAPITALS + birth year (e.g. RAJE1990). e-PAN: date of birth as DDMMYYYY. Check your document's own instructions.</div>
+    <div class="cs-msg" id="ulMsgExt"></div>
+    <button class="btn-tool-ext" id="btnUlExt" disabled>Unlock PDF →</button>
+    <button class="cs-dl" id="btnUlDlExt" type="button">⬇ Download unlocked PDF</button>
+    <div class="cs-note">Your file and password are sent to our server over HTTPS to remove the lock. It needs the correct password and cannot recover one.</div>
   </div>
 </div>
 

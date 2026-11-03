@@ -1197,6 +1197,59 @@ async def organize_pdf(
 
 
 # ══════════════════════════════════════════════
+# Unlock PDF: remove a password the user already knows
+# ══════════════════════════════════════════════
+@app.post("/unlock-pdf")
+@limiter.limit("5/minute")
+async def unlock_pdf(request: Request, file: UploadFile = File(...), password: str = Form("")):
+    """Remove the password from a PDF. The correct password is required; nothing is guessed or cracked."""
+    load_libs()
+    try:
+        file_bytes = await read_upload(file)
+        if not file_bytes.startswith(b"%PDF-"):
+            raise InvalidUploadError("Please upload a PDF file.")
+        if len(password) > 128:
+            raise InvalidUploadError("That password is too long.")
+        try:
+            doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
+        except Exception as exc:
+            raise InvalidUploadError("Could not open this PDF. It may be damaged.") from exc
+        try:
+            notice = None
+            if doc.needs_pass:
+                if not password:
+                    raise InvalidUploadError("This PDF is password-protected. Please enter its password.")
+                if not doc.authenticate(password):
+                    raise InvalidUploadError("That password is not correct. Please check it and try again.")
+            else:
+                notice = "This PDF was not password-protected. Here is a clean copy."
+            if doc.page_count > MAX_PDF_PAGES:
+                raise InvalidUploadError(f"This PDF has more than {MAX_PDF_PAGES} pages, which is the maximum.")
+            buf = io.BytesIO()
+            doc.save(buf, garbage=3, deflate=True, encryption=fitz_mod.PDF_ENCRYPT_NONE)
+            out_bytes = buf.getvalue()
+            page_total = doc.page_count
+        finally:
+            doc.close()
+        out_bytes = validate_pdf_bytes(ensure_output(out_bytes, "PDF unlock"))
+        return JSONResponse(content={
+            "pdf": base64.b64encode(out_bytes).decode(),
+            "size_kb": round(len(out_bytes) / 1024, 1),
+            "pages": page_total,
+            "notice": notice,
+        })
+    except InvalidUploadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("PDF unlock failed")   # never log the password
+        raise HTTPException(status_code=422, detail="Could not unlock this PDF.")
+    finally:
+        await file.close()
+
+
+# ══════════════════════════════════════════════
 # NEW ENDPOINT: PDF to Text (extract text)
 # ══════════════════════════════════════════════
 @app.post("/pdf-to-text")

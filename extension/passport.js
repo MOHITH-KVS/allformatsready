@@ -7,8 +7,7 @@ let ppSelectedPreset = { w:35, h:45, name:"Standard Passport" };
 let ppBgColor = "#ffffff";
 let ppCropX = 0, ppCropY = 0, ppCropW = 0, ppCropH = 0;
 let ppDragging = false;
-let ppDragStartX = 0, ppDragStartY = 0;
-let ppCropStartX = 0, ppCropStartY = 0;
+let ppDragX0 = 0, ppDragY0 = 0, ppCropX0 = 0, ppCropY0 = 0;
 let ppCanvas = null, ppCtx = null;
 let ppScale = 1;
 let ppIsCustom = false;
@@ -93,6 +92,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ppImage){ initCropBox(); drawCropCanvas(); resetResult(); }
   });
 
+  document.getElementById("ppFillFrame")?.addEventListener("click", () => { if(ppImage){ ppFillFrame(); drawCropCanvas(); resetResult(); } });
+
   // ── File upload ──
   const ppFileInput = document.getElementById("ppFileInput");
   const ppDrop = document.getElementById("ppDrop");
@@ -156,65 +157,82 @@ function loadPPImage(file){
   reader.readAsDataURL(file);
 }
 
+function ppContain(){
+  const ratio=ppSelectedPreset.w/ppSelectedPreset.h, ir=ppImage.width/ppImage.height;
+  return ir>=ratio ? {w:ppImage.width,h:ppImage.width/ratio} : {w:ppImage.height*ratio,h:ppImage.height};
+}
+function ppCoverZoom(){
+  const c=ppContain(), ratio=ppSelectedPreset.w/ppSelectedPreset.h;
+  return c.w/Math.min(ppImage.width,ppImage.height*ratio);
+}
+function ppClamp(){
+  // Axes where the frame is larger than the photo stay centred (the photo is never cut there)
+  if(ppCropW>=ppImage.width) ppCropX=(ppImage.width-ppCropW)/2; else ppCropX=Math.max(0,Math.min(ppImage.width-ppCropW,ppCropX));
+  if(ppCropH>=ppImage.height) ppCropY=(ppImage.height-ppCropH)/2; else ppCropY=Math.max(0,Math.min(ppImage.height-ppCropH,ppCropY));
+}
+function ppSyncZoom(){
+  const zs=document.getElementById("ppZoomSlider"), zv=document.getElementById("ppZoomVal");
+  if(zs){ zs.min=100; zs.max=Math.max(300,Math.ceil(ppCoverZoom()*100)+60); zs.value=Math.round(ppZoom*100); }
+  if(zv) zv.textContent=Math.round(ppZoom*100)+"%";
+}
 function initCropBox(){
   if(!ppImage) return;
-  const ratio=ppSelectedPreset.w/ppSelectedPreset.h;
-  ppCropW=ppImage.width*0.7/ppZoom;
-  ppCropH=ppCropW/ratio;
-  if(ppCropH>ppImage.height*0.9){ppCropH=ppImage.height*0.9;ppCropW=ppCropH*ratio;}
-  ppCropX=(ppImage.width-ppCropW)/2;
-  ppCropY=ppImage.height*0.03;
+  // Auto-fit: the WHOLE photo fits inside the chosen size. Nothing is cut.
+  ppZoom=1; const c=ppContain();
+  ppCropW=c.w; ppCropH=c.h; ppCropX=(ppImage.width-ppCropW)/2; ppCropY=(ppImage.height-ppCropH)/2;
+  ppClamp(); ppSyncZoom();
 }
-
+function ppFillFrame(){
+  if(!ppImage) return;
+  // Fill the frame (crop to the shape), keeping the head area: biased towards the top
+  const z=ppCoverZoom(), c=ppContain(); ppZoom=z;
+  ppCropW=c.w/z; ppCropH=c.h/z; ppCropX=(ppImage.width-ppCropW)/2; ppCropY=(ppImage.height-ppCropH)*0.15;
+  ppClamp(); ppSyncZoom();
+}
 function updateCropSize(){
   if(!ppImage) return;
-  const ratio=ppSelectedPreset.w/ppSelectedPreset.h;
-  const cx=ppCropX+ppCropW/2, cy=ppCropY+ppCropH/2;
-  ppCropW=ppImage.width*0.7/ppZoom;
-  ppCropH=ppCropW/ratio;
-  ppCropX=Math.max(0,Math.min(ppImage.width-ppCropW,cx-ppCropW/2));
-  ppCropY=Math.max(0,Math.min(ppImage.height-ppCropH,cy-ppCropH/2));
+  const c=ppContain(), cx=ppCropX+ppCropW/2, cy=ppCropY+ppCropH/2;
+  ppCropW=c.w/ppZoom; ppCropH=c.h/ppZoom; ppCropX=cx-ppCropW/2; ppCropY=cy-ppCropH/2; ppClamp();
 }
-
 function drawCropCanvas(){
-  if(!ppImage) return;
-  const maxW=340,maxH=200,ir=ppImage.width/ppImage.height;
-  let dW=maxW,dH=maxW/ir;
-  if(dH>maxH){dH=maxH;dW=maxH*ir;}
-  ppCanvas.width=dW; ppCanvas.height=dH; ppScale=dW/ppImage.width;
-  ppCtx.drawImage(ppImage,0,0,dW,dH);
-  ppCtx.fillStyle="rgba(0,0,0,0.6)"; ppCtx.fillRect(0,0,dW,dH);
-  const cx=ppCropX*ppScale,cy=ppCropY*ppScale,cw=ppCropW*ppScale,ch=ppCropH*ppScale;
-  ppCtx.save();
-  ppCtx.beginPath(); ppCtx.rect(cx,cy,cw,ch); ppCtx.clip();
+  if(!ppImage||!ppCanvas) return;
+  // Canvas shows the photo plus any empty frame area around it
+  const bx0=Math.min(0,ppCropX), by0=Math.min(0,ppCropY), bx1=Math.max(ppImage.width,ppCropX+ppCropW), by1=Math.max(ppImage.height,ppCropY+ppCropH);
+  const bw=bx1-bx0, bh=by1-by0, maxW=340, maxH=200, br=bw/bh;
+  let dW=maxW, dH=maxW/br; if(dH>maxH){dH=maxH;dW=maxH*br;}
+  ppCanvas.width=dW; ppCanvas.height=dH; ppScale=dW/bw;
+  const ix=(0-bx0)*ppScale, iy=(0-by0)*ppScale, iw=ppImage.width*ppScale, ih=ppImage.height*ppScale;
+  ppCtx.fillStyle="#D1D5DB"; ppCtx.fillRect(0,0,dW,dH);
+  ppCtx.drawImage(ppImage,ix,iy,iw,ih);
+  ppCtx.fillStyle="rgba(0,0,0,0.55)"; ppCtx.fillRect(0,0,dW,dH);
+  const cx=(ppCropX-bx0)*ppScale, cy=(ppCropY-by0)*ppScale, cw=ppCropW*ppScale, ch=ppCropH*ppScale;
+  ppCtx.save(); ppCtx.beginPath(); ppCtx.rect(cx,cy,cw,ch); ppCtx.clip();
   ppCtx.fillStyle=ppBgColor; ppCtx.fillRect(cx,cy,cw,ch);
-  ppCtx.drawImage(ppImage,0,0,dW,dH);
-  // Face oval guide
-  ppCtx.strokeStyle="rgba(255,255,0,0.6)";
-  ppCtx.lineWidth=1.5; ppCtx.setLineDash([4,3]);
-  ppCtx.beginPath();
-  ppCtx.ellipse(cx+cw/2,cy+ch*0.38,cw*0.28,ch*0.32,0,0,Math.PI*2);
-  ppCtx.stroke(); ppCtx.setLineDash([]);
+  ppCtx.drawImage(ppImage,ix,iy,iw,ih);
+  ppCtx.strokeStyle="rgba(255,255,0,0.5)"; ppCtx.lineWidth=1.5; ppCtx.setLineDash([4,3]);
+  ppCtx.beginPath(); ppCtx.ellipse(cx+cw/2,cy+ch*0.38,cw*0.28,ch*0.32,0,0,Math.PI*2); ppCtx.stroke(); ppCtx.setLineDash([]);
   ppCtx.restore();
   ppCtx.strokeStyle="#fff"; ppCtx.lineWidth=2; ppCtx.strokeRect(cx,cy,cw,ch);
   const hs=8; ppCtx.fillStyle="#fff";
   [[cx,cy],[cx+cw-hs,cy],[cx,cy+ch-hs],[cx+cw-hs,cy+ch-hs]].forEach(([hx,hy])=>ppCtx.fillRect(hx,hy,hs,hs));
-  ppCtx.strokeStyle="rgba(255,255,255,0.2)"; ppCtx.lineWidth=0.5;
-  ppCtx.beginPath();
-  ppCtx.moveTo(cx+cw/3,cy);ppCtx.lineTo(cx+cw/3,cy+ch);
-  ppCtx.moveTo(cx+cw*2/3,cy);ppCtx.lineTo(cx+cw*2/3,cy+ch);
-  ppCtx.moveTo(cx,cy+ch/3);ppCtx.lineTo(cx+cw,cy+ch/3);
-  ppCtx.moveTo(cx,cy+ch*2/3);ppCtx.lineTo(cx+cw,cy+ch*2/3);
-  ppCtx.stroke();
+  ppCtx.strokeStyle="rgba(255,255,255,0.2)"; ppCtx.lineWidth=0.5; ppCtx.beginPath();
+  ppCtx.moveTo(cx+cw/3,cy);ppCtx.lineTo(cx+cw/3,cy+ch); ppCtx.moveTo(cx+cw*2/3,cy);ppCtx.lineTo(cx+cw*2/3,cy+ch);
+  ppCtx.moveTo(cx,cy+ch/3);ppCtx.lineTo(cx+cw,cy+ch/3); ppCtx.moveTo(cx,cy+ch*2/3);ppCtx.lineTo(cx+cw,cy+ch*2/3); ppCtx.stroke();
   ppCtx.fillStyle="rgba(0,0,0,0.5)"; ppCtx.fillRect(cx,cy+ch-16,cw,16);
   ppCtx.fillStyle="#fff"; ppCtx.font="9px Arial"; ppCtx.textAlign="center";
-  ppCtx.fillText(`${ppSelectedPreset.w}×${ppSelectedPreset.h}mm`,cx+cw/2,cy+ch-4);
-  ppCtx.textAlign="left";
+  ppCtx.fillText(`${ppSelectedPreset.w}×${ppSelectedPreset.h}mm`,cx+cw/2,cy+ch-4); ppCtx.textAlign="left";
 }
-
-function ds(e){ ppDragging=true; const r=ppCanvas.getBoundingClientRect(); ppDragStartX=(e.clientX||e.pageX)-r.left; ppDragStartY=(e.clientY||e.pageY)-r.top; ppCropStartX=ppCropX; ppCropStartY=ppCropY; }
-function dm(e){ if(!ppDragging) return; const r=ppCanvas.getBoundingClientRect(); const mx=(e.clientX||e.pageX)-r.left,my=(e.clientY||e.pageY)-r.top; ppCropX=Math.max(0,Math.min(ppImage.width-ppCropW,ppCropStartX+(mx-ppDragStartX)/ppScale)); ppCropY=Math.max(0,Math.min(ppImage.height-ppCropH,ppCropStartY+(my-ppDragStartY)/ppScale)); drawCropCanvas(); }
+function ds(e){
+  ppDragging=true; const r=ppCanvas.getBoundingClientRect();
+  ppDragX0=(e.clientX||e.pageX)-r.left; ppDragY0=(e.clientY||e.pageY)-r.top; ppCropX0=ppCropX; ppCropY0=ppCropY;
+}
+function dm(e){
+  if(!ppDragging) return;
+  const r=ppCanvas.getBoundingClientRect(), mx=(e.clientX||e.pageX)-r.left, my=(e.clientY||e.pageY)-r.top;
+  ppCropX=ppCropX0+(mx-ppDragX0)/ppScale; ppCropY=ppCropY0+(my-ppDragY0)/ppScale; ppClamp(); drawCropCanvas();
+}
 function de(){ ppDragging=false; }
+
 
 function generatePassportPhoto(){
   if(!ppImage) return;
@@ -222,7 +240,9 @@ function generatePassportPhoto(){
   const oc=document.createElement("canvas"); oc.width=outW; oc.height=outH;
   const ctx=oc.getContext("2d");
   ctx.fillStyle=ppBgColor; ctx.fillRect(0,0,outW,outH);
-  ctx.drawImage(ppImage,ppCropX,ppCropY,ppCropW,ppCropH,0,0,outW,outH);
+  const sx=outW/ppCropW, sy=outH/ppCropH;
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+  ctx.drawImage(ppImage,0,0,ppImage.width,ppImage.height,(0-ppCropX)*sx,(0-ppCropY)*sy,ppImage.width*sx,ppImage.height*sy);
   document.getElementById("ppResultImg").src=oc.toDataURL("image/jpeg",0.92);
   document.getElementById("ppResultTitle").textContent=ppSelectedPreset.name;
   document.getElementById("ppResultSize").textContent=`${ppSelectedPreset.w.toFixed(1)}×${ppSelectedPreset.h.toFixed(1)}mm · ${outW}×${outH}px · 300 DPI`;

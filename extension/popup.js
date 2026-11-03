@@ -777,7 +777,7 @@ function afrCelebrate(){
 
   // Tiles and back buttons
   document.querySelectorAll(".tl-tile").forEach(t=>t.addEventListener("click",()=>go(t.dataset.go)));
-  ["merge","textex","organizer","resizer","mask"].forEach(id=>{
+  ["merge","textex","organizer","resizer","unlock"].forEach(id=>{
     const p=$("tab-"+id); if(!p) return;
     const b=document.createElement("button"); b.type="button"; b.className="tool-back"; b.textContent="← More Tools";
     b.addEventListener("click",()=>go("tools")); p.insertBefore(b,p.firstChild);
@@ -875,47 +875,32 @@ function afrCelebrate(){
   });
   rsDl.addEventListener("click",()=>{ if(rsBlob) save(rsBlob,rsName+"_resized.jpg"); });
 
-  // ───── Mask Sensitive Info (manual, on device) ─────
-  const mkIn=$("mkInExt"), mkC=$("mkCanvasExt"), mkX=mkC.getContext("2d"), mkStage=$("mkStageExt"), mkHint=$("mkHintExt"),
-        mkMode=$("mkModeExt"), btnUndo=$("btnMkUndoExt"), btnClear=$("btnMkClearExt"), btnMkDl=$("btnMkDlExt");
-  let mkBase=null, mkRects=[], mkDrag=null, mkStart=null, mkName="image";
-  function apply(r){
-    if(r.mode==="box"){ mkX.fillStyle="#000"; mkX.fillRect(r.x,r.y,r.w,r.h); return; }
-    const blk=Math.max(10,Math.round(Math.max(mkC.width,mkC.height)/60)), sw=Math.max(1,Math.ceil(r.w/blk)), sh=Math.max(1,Math.ceil(r.h/blk));
-    const t=document.createElement("canvas"); t.width=sw; t.height=sh; t.getContext("2d").drawImage(mkBase,r.x,r.y,r.w,r.h,0,0,sw,sh);
-    mkX.imageSmoothingEnabled=false; mkX.drawImage(t,0,0,sw,sh,r.x,r.y,r.w,r.h); mkX.imageSmoothingEnabled=true;
-  }
-  function draw(){
-    if(!mkBase) return;
-    mkX.drawImage(mkBase,0,0); mkRects.forEach(apply);
-    if(mkDrag){ mkX.save(); mkX.strokeStyle="#2563EB"; mkX.lineWidth=Math.max(2,mkC.width/300); mkX.setLineDash([8,6]); mkX.strokeRect(mkDrag.x,mkDrag.y,mkDrag.w,mkDrag.h); mkX.restore(); }
-    btnUndo.disabled=btnClear.disabled=mkRects.length===0; btnMkDl.disabled=mkRects.length===0;
-    btnMkDl.title=mkRects.length?"":"Cover at least one area first";
-    if(mkRects.length){ mkHint.className="cs-msg show ok"; mkHint.textContent=`✅ ${mkRects.length} area${mkRects.length>1?"s":""} hidden. Check the preview, then download.`; }
-    else { mkHint.className="cs-msg show todo"; mkHint.textContent="👆 Nothing hidden yet. Drag over the PAN or Aadhaar number. Download unlocks after you cover one area."; }
-  }
-  mkIn.addEventListener("change",async()=>{
-    const f=mkIn.files[0]; if(!f) return;
-    if(!isImg(f)){ say(mkHint,"Please choose a JPG, PNG or WebP image.","err"); mkIn.value=""; return; }
-    if(f.size>MAXB){ say(mkHint,"File is larger than 10MB.","err"); mkIn.value=""; return; }
-    try{
-      const img=await loadImg(f), s=Math.min(1,2000/Math.max(img.width,img.height));
-      mkBase=document.createElement("canvas"); mkBase.width=mkC.width=Math.round(img.width*s); mkBase.height=mkC.height=Math.round(img.height*s);
-      mkBase.getContext("2d").drawImage(img,0,0,mkBase.width,mkBase.height);
-      mkRects=[]; mkDrag=null; mkName=base(f.name); $("mkDropTextExt").textContent="🛡️ "+f.name; mkStage.classList.add("show"); draw();
-    }catch(e){ say(mkHint,e.message,"err"); }
+  // ───── Unlock PDF (server) ─────
+  const ulIn=$("ulInExt"), btnUl=$("btnUlExt"), ulMsg=$("ulMsgExt"), ulDl=$("btnUlDlExt"), ulPass=$("ulPassExt");
+  let ulFile=null, ulBlob=null, ulName="unlocked";
+  ulIn.addEventListener("change",()=>{
+    const f=ulIn.files[0]; ulBlob=null; ulDl.classList.remove("show"); ulMsg.className="cs-msg"; btnUl.disabled=true; ulFile=null;
+    if(!f) return;
+    if(!/\.pdf$/i.test(f.name)&&f.type!=="application/pdf"){ say(ulMsg,"Please choose a PDF file.","err"); ulIn.value=""; return; }
+    if(f.size>MAXB){ say(ulMsg,"File is larger than 10MB.","err"); ulIn.value=""; return; }
+    ulFile=f; ulName=base(f.name); $("ulDropTextExt").textContent="🔓 "+f.name; btnUl.disabled=false;
   });
-  const pt=e=>{ const r=mkC.getBoundingClientRect(); return {x:Math.min(Math.max((e.clientX-r.left)*mkC.width/r.width,0),mkC.width), y:Math.min(Math.max((e.clientY-r.top)*mkC.height/r.height,0),mkC.height)}; };
-  mkC.addEventListener("pointerdown",e=>{ if(!mkBase) return; mkStart=pt(e); mkDrag={x:mkStart.x,y:mkStart.y,w:0,h:0}; mkC.setPointerCapture(e.pointerId); e.preventDefault(); });
-  mkC.addEventListener("pointermove",e=>{ if(!mkStart) return; const p=pt(e); mkDrag={x:Math.min(mkStart.x,p.x),y:Math.min(mkStart.y,p.y),w:Math.abs(p.x-mkStart.x),h:Math.abs(p.y-mkStart.y)}; draw(); });
-  function finish(commit){
-    if(!mkStart) return; const min=Math.max(6,mkC.width/150);
-    if(commit&&mkDrag&&mkDrag.w>=min&&mkDrag.h>=min){ mkRects.push({x:Math.round(mkDrag.x),y:Math.round(mkDrag.y),w:Math.round(mkDrag.w),h:Math.round(mkDrag.h),mode:mkMode.value}); afrToast("🛡️ Area hidden","ok"); }
-    mkStart=null; mkDrag=null; draw();
-  }
-  mkC.addEventListener("pointerup",()=>finish(true)); mkC.addEventListener("pointercancel",()=>finish(false));
-  btnUndo.addEventListener("click",()=>{ mkRects.pop(); draw(); }); btnClear.addEventListener("click",()=>{ mkRects=[]; draw(); });
-  btnMkDl.addEventListener("click",async()=>{ if(!mkBase||!mkRects.length) return; mkDrag=null; draw(); const b=await jpeg(mkC,0.92); if(b){ save(b,mkName+"_masked.jpg"); afrCelebrate(); } });
+  ulPass.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!btnUl.disabled){ e.preventDefault(); btnUl.click(); } });
+  btnUl.addEventListener("click",async()=>{
+    if(!ulFile) return;
+    ulDl.classList.remove("show"); ulMsg.className="cs-msg"; btnUl.disabled=true; btnUl.classList.add("is-loading"); btnUl.textContent="Unlocking…";
+    try{
+      const fd=new FormData(); fd.append("file",ulFile); fd.append("password",ulPass.value);
+      const r=await fetch(`${API_URL}/unlock-pdf`,{method:"POST",body:fd});
+      if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"Could not unlock this PDF."); }
+      const d=await r.json(); const bin=atob(d.pdf), bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      ulBlob=new Blob([bytes],{type:"application/pdf"}); ulPass.value="";
+      say(ulMsg,`✅ ${d.pages} page${d.pages===1?"":"s"} · ${d.size_kb} KB`+(d.notice?` — ${d.notice}`:""),d.notice?"err":"ok");
+      ulDl.classList.add("show"); afrToast("🔓 PDF unlocked","ok"); afrCelebrate();
+    }catch(err){ say(ulMsg,err.message||"Could not unlock this PDF. Try again.","err"); }
+    finally{ btnUl.disabled=false; btnUl.classList.remove("is-loading"); btnUl.textContent="Unlock PDF →"; }
+  });
+  ulDl.addEventListener("click",()=>{ if(ulBlob) save(ulBlob,ulName+"_unlocked.pdf"); });
 
   // ───── Success feedback for every result panel ─────
   function watch(el,fn){ if(!el) return; let on=el.classList.contains("show"); new MutationObserver(()=>{ const now=el.classList.contains("show"); if(now&&!on) fn(el); on=now; }).observe(el,{attributes:true,attributeFilter:["class"]}); }
