@@ -777,7 +777,7 @@ function afrCelebrate(){
 
   // Tiles and back buttons
   document.querySelectorAll(".tl-tile").forEach(t=>t.addEventListener("click",()=>go(t.dataset.go)));
-  ["merge","textex","organizer","resizer","unlock"].forEach(id=>{
+  ["merge","textex","organizer","resizer","bgremove","audio"].forEach(id=>{
     const p=$("tab-"+id); if(!p) return;
     const b=document.createElement("button"); b.type="button"; b.className="tool-back"; b.textContent="← More Tools";
     b.addEventListener("click",()=>go("tools")); p.insertBefore(b,p.firstChild);
@@ -875,32 +875,96 @@ function afrCelebrate(){
   });
   rsDl.addEventListener("click",()=>{ if(rsBlob) save(rsBlob,rsName+"_resized.jpg"); });
 
-  // ───── Unlock PDF (server) ─────
-  const ulIn=$("ulInExt"), btnUl=$("btnUlExt"), ulMsg=$("ulMsgExt"), ulDl=$("btnUlDlExt"), ulPass=$("ulPassExt");
-  let ulFile=null, ulBlob=null, ulName="unlocked";
-  ulIn.addEventListener("change",()=>{
-    const f=ulIn.files[0]; ulBlob=null; ulDl.classList.remove("show"); ulMsg.className="cs-msg"; btnUl.disabled=true; ulFile=null;
+  // ───── Background Remover (on device, plain-background method) ─────
+  const bgIn=$("bgInExt"), bgTol=$("bgTolExt"), bgSw=$("bgSwExt"), bgColor=$("bgColorExt"), bgCanvas=$("bgCanvasExt"), bgMsg=$("bgMsgExt"), btnBg=$("btnBgExt"), btnPng=$("btnBgPngExt"), btnJpg=$("btnBgJpgExt");
+  let bgImg=null, bgName="photo", bgCut=null, bgFill="transparent";
+  function bgPlain(img,tol){
+    const s=Math.min(1,1600/Math.max(img.width,img.height)), c=document.createElement("canvas"); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+    const x=c.getContext("2d",{willReadFrequently:true}); x.drawImage(img,0,0,c.width,c.height);
+    const w=c.width, h=c.height, id=x.getImageData(0,0,w,h), d=id.data, thr2=tol*tol;
+    const rs=[],gs=[],bs=[], step=Math.max(1,Math.floor(Math.min(w,h)/200));
+    const take=(px,py)=>{ const i=(py*w+px)*4; rs.push(d[i]); gs.push(d[i+1]); bs.push(d[i+2]); };
+    for(let i=0;i<w;i+=step){ take(i,0); take(i,h-1); } for(let j=0;j<h;j+=step){ take(0,j); take(w-1,j); }
+    const med=a=>a.sort((p,q)=>p-q)[a.length>>1], br=med(rs), bg=med(gs), bb=med(bs);
+    const near=p=>{ const i=p*4, dr=d[i]-br, dg=d[i+1]-bg, db=d[i+2]-bb; return dr*dr+dg*dg+db*db<=thr2; };
+    const seen=new Uint8Array(w*h), stack=new Int32Array(w*h); let sp=0, removed=0;
+    const seed=(px,py)=>{ const p=py*w+px; if(!seen[p]&&near(p)){ seen[p]=1; stack[sp++]=p; } };
+    for(let i=0;i<w;i++){ seed(i,0); seed(i,h-1); } for(let j=0;j<h;j++){ seed(0,j); seed(w-1,j); }
+    while(sp){
+      const p=stack[--sp], px=p%w, py=(p/w)|0;
+      if(px>0&&!seen[p-1]&&near(p-1)){ seen[p-1]=1; stack[sp++]=p-1; }
+      if(px<w-1&&!seen[p+1]&&near(p+1)){ seen[p+1]=1; stack[sp++]=p+1; }
+      if(py>0&&!seen[p-w]&&near(p-w)){ seen[p-w]=1; stack[sp++]=p-w; }
+      if(py<h-1&&!seen[p+w]&&near(p+w)){ seen[p+w]=1; stack[sp++]=p+w; }
+    }
+    let alpha=new Float32Array(w*h); for(let p=0;p<w*h;p++){ alpha[p]=seen[p]?0:1; if(seen[p]) removed++; }
+    for(let pass=0;pass<2;pass++){
+      const out=new Float32Array(w*h);
+      for(let py=0;py<h;py++) for(let px=0;px<w;px++){
+        let sum=0,n=0;
+        for(let dy=-1;dy<=1;dy++){ const yy=py+dy; if(yy<0||yy>=h) continue; for(let dx=-1;dx<=1;dx++){ const xx=px+dx; if(xx<0||xx>=w) continue; sum+=alpha[yy*w+xx]; n++; } }
+        out[py*w+px]=sum/n;
+      }
+      alpha=out;
+    }
+    for(let p=0;p<w*h;p++) d[p*4+3]=Math.round(alpha[p]*255);
+    x.putImageData(id,0,0); return {canvas:c, share:removed/(w*h)};
+  }
+  function bgCompose(forJpg){
+    if(!bgCut) return null;
+    const c=document.createElement("canvas"); c.width=bgCut.width; c.height=bgCut.height; const x=c.getContext("2d");
+    const fill=bgFill==="transparent"?(forJpg?"#FFFFFF":null):bgFill; if(fill){ x.fillStyle=fill; x.fillRect(0,0,c.width,c.height); }
+    x.drawImage(bgCut,0,0); return c;
+  }
+  function bgRender(){ const c=bgCompose(false); if(!c) return; bgCanvas.width=c.width; bgCanvas.height=c.height; bgCanvas.getContext("2d").drawImage(c,0,0); bgCanvas.classList.add("show"); }
+  bgSw.addEventListener("click",e=>{ const b=e.target.closest(".bg-sw-ext"); if(!b) return; bgSw.querySelectorAll(".bg-sw-ext").forEach(x=>x.classList.toggle("active",x===b)); bgFill=b.dataset.fill; bgRender(); });
+  bgColor.addEventListener("input",()=>{ bgSw.querySelectorAll(".bg-sw-ext").forEach(x=>x.classList.remove("active")); bgFill=bgColor.value; bgRender(); });
+  bgIn.addEventListener("change",async()=>{
+    const f=bgIn.files[0]; bgCut=null; bgCanvas.classList.remove("show"); btnPng.classList.remove("show"); btnJpg.classList.remove("show"); bgMsg.className="cs-msg"; btnBg.disabled=true; bgImg=null;
     if(!f) return;
-    if(!/\.pdf$/i.test(f.name)&&f.type!=="application/pdf"){ say(ulMsg,"Please choose a PDF file.","err"); ulIn.value=""; return; }
-    if(f.size>MAXB){ say(ulMsg,"File is larger than 10MB.","err"); ulIn.value=""; return; }
-    ulFile=f; ulName=base(f.name); $("ulDropTextExt").textContent="🔓 "+f.name; btnUl.disabled=false;
+    if(!isImg(f)){ say(bgMsg,"Please choose a JPG, PNG or WebP image.","err"); bgIn.value=""; return; }
+    if(f.size>MAXB){ say(bgMsg,"File is larger than 10MB.","err"); bgIn.value=""; return; }
+    try{ bgImg=await loadImg(f); bgName=base(f.name); $("bgDropTextExt").textContent="🪄 "+f.name; btnBg.disabled=false; }catch(e){ say(bgMsg,e.message,"err"); }
   });
-  ulPass.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!btnUl.disabled){ e.preventDefault(); btnUl.click(); } });
-  btnUl.addEventListener("click",async()=>{
-    if(!ulFile) return;
-    ulDl.classList.remove("show"); ulMsg.className="cs-msg"; btnUl.disabled=true; btnUl.classList.add("is-loading"); btnUl.textContent="Unlocking…";
+  btnBg.addEventListener("click",()=>{
+    if(!bgImg) return; bgMsg.className="cs-msg"; btnBg.disabled=true; btnBg.classList.add("is-loading"); btnBg.textContent="Working…";
+    setTimeout(()=>{
+      try{
+        const r=bgPlain(bgImg,+bgTol.value); bgCut=r.canvas; bgRender(); btnPng.classList.add("show"); btnJpg.classList.add("show");
+        if(r.share>0.97) say(bgMsg,"Almost the whole picture was removed. Lower the Sensitivity.","err");
+        else if(r.share<0.01) say(bgMsg,"No plain background found. Raise the Sensitivity, or use the website's Smart method.","err");
+        else { say(bgMsg,`✅ ${bgCut.width}×${bgCut.height} px`,"ok"); afrToast("🪄 Background removed","ok"); afrCelebrate(); }
+      }catch(err){ say(bgMsg,err.message||"Could not process this image.","err"); }
+      btnBg.disabled=false; btnBg.classList.remove("is-loading"); btnBg.textContent="Remove background →";
+    },30);
+  });
+  btnPng.addEventListener("click",()=>{ const c=bgCompose(false); if(c) c.toBlob(b=>save(b,bgName+"_no-bg.png"),"image/png"); });
+  btnJpg.addEventListener("click",()=>{ const c=bgCompose(true); if(c) c.toBlob(b=>save(b,bgName+"_bg.jpg"),"image/jpeg",0.95); });
+
+  // ───── Audio Converter (server: /convert-audio) ─────
+  const auIn=$("auInExt"), auFmts=$("auFmtsExt"), auBr=$("auBrExt"), auBrRow=$("auBrRowExt"), btnAu=$("btnAuExt"), auMsg=$("auMsgExt"), auDl=$("btnAuDlExt");
+  const AUMAX=20*1024*1024; let auFile=null, auFmt="mp3", auBlob=null, auName="audio";
+  const fmtSize=n=>n>1048576?(n/1048576).toFixed(1)+" MB":Math.round(n/1024)+" KB";
+  auFmts.addEventListener("click",e=>{ const b=e.target.closest(".au-fmt-ext"); if(!b) return; auFmts.querySelectorAll(".au-fmt-ext").forEach(x=>x.classList.toggle("active",x===b)); auFmt=b.dataset.fmt; auBrRow.hidden=(auFmt==="wav"||auFmt==="flac"); auDl.classList.remove("show"); });
+  auIn.addEventListener("change",()=>{
+    const f=auIn.files[0]; auBlob=null; auDl.classList.remove("show"); auMsg.className="cs-msg"; btnAu.disabled=true; auFile=null;
+    if(!f) return;
+    if(!(/^audio\//.test(f.type)||/\.(mp3|wav|m4a|aac|ogg|opus|flac|wma|amr|aiff?|webm|mp4|3gp)$/i.test(f.name))){ say(auMsg,"Please choose an audio file.","err"); auIn.value=""; return; }
+    if(f.size>AUMAX){ say(auMsg,"File is larger than 20MB.","err"); auIn.value=""; return; }
+    auFile=f; auName=base(f.name); $("auDropTextExt").textContent="🎵 "+f.name+" ("+fmtSize(f.size)+")"; btnAu.disabled=false;
+  });
+  btnAu.addEventListener("click",async()=>{
+    if(!auFile) return; auDl.classList.remove("show"); auMsg.className="cs-msg"; btnAu.disabled=true; btnAu.classList.add("is-loading"); btnAu.textContent="Converting…";
     try{
-      const fd=new FormData(); fd.append("file",ulFile); fd.append("password",ulPass.value);
-      const r=await fetch(`${API_URL}/unlock-pdf`,{method:"POST",body:fd});
-      if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"Could not unlock this PDF."); }
-      const d=await r.json(); const bin=atob(d.pdf), bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-      ulBlob=new Blob([bytes],{type:"application/pdf"}); ulPass.value="";
-      say(ulMsg,`✅ ${d.pages} page${d.pages===1?"":"s"} · ${d.size_kb} KB`+(d.notice?` — ${d.notice}`:""),d.notice?"err":"ok");
-      ulDl.classList.add("show"); afrToast("🔓 PDF unlocked","ok"); afrCelebrate();
-    }catch(err){ say(ulMsg,err.message||"Could not unlock this PDF. Try again.","err"); }
-    finally{ btnUl.disabled=false; btnUl.classList.remove("is-loading"); btnUl.textContent="Unlock PDF →"; }
+      const fd=new FormData(); fd.append("file",auFile); fd.append("format",auFmt); fd.append("bitrate",auBr.value);
+      const r=await fetch(`${API_URL}/convert-audio`,{method:"POST",body:fd});
+      if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"Could not convert this audio file."); }
+      auBlob=await r.blob(); if(!auBlob.size) throw new Error("The server returned an empty file.");
+      say(auMsg,`✅ ${auFmt.toUpperCase()} · ${fmtSize(auBlob.size)}`,"ok"); auDl.classList.add("show"); afrToast("🎵 Audio ready","ok"); afrCelebrate();
+    }catch(err){ say(auMsg,err.message||"Could not convert this audio file. Try again.","err"); }
+    finally{ btnAu.disabled=false; btnAu.classList.remove("is-loading"); btnAu.textContent="Convert audio →"; }
   });
-  ulDl.addEventListener("click",()=>{ if(ulBlob) save(ulBlob,ulName+"_unlocked.pdf"); });
+  auDl.addEventListener("click",()=>{ if(auBlob) save(auBlob,auName+"."+auFmt); });
 
   // ───── Success feedback for every result panel ─────
   function watch(el,fn){ if(!el) return; let on=el.classList.contains("show"); new MutationObserver(()=>{ const now=el.classList.contains("show"); if(now&&!on) fn(el); on=now; }).observe(el,{attributes:true,attributeFilter:["class"]}); }

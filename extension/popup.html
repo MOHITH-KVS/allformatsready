@@ -387,7 +387,6 @@
     .tl-tile:nth-child(2){animation-delay:.04s}.tl-tile:nth-child(3){animation-delay:.08s}.tl-tile:nth-child(4){animation-delay:.12s}.tl-tile:nth-child(5){animation-delay:.16s}
     .tl-tile:hover{transform:translateY(-2px);border-color:#BFDBFE;box-shadow:0 6px 14px rgba(37,99,235,.12)}
     .tl-tile:active{transform:scale(.97)}
-    .tl-tile:last-child{grid-column:1/-1}
     .tl-ic{font-size:1.25rem;transition:transform .2s}
     .tl-tile:hover .tl-ic{transform:scale(1.15) rotate(-6deg)}
     .tl-tile b{font-size:.76rem;color:var(--gray-800)}
@@ -429,6 +428,21 @@
     .hi-dl.btn-ok{color:#fff !important}
     #resultsWrap.show .results-title,.tool-result-ext.show .tool-result-title{animation:afrPop .45s ease}
     @media (prefers-reduced-motion:reduce){.btn-ok{animation:none}}
+    /* Background remover + audio (extension) */
+    .bg-sw-row{display:flex;align-items:center;gap:8px}
+    .bg-sw-ext{width:26px;height:26px;border-radius:50%;border:2px solid var(--gray-200);cursor:pointer;padding:0;transition:transform .15s,box-shadow .15s}
+    .bg-sw-ext:hover{transform:scale(1.1)}
+    .bg-sw-ext.active{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.22)}
+    .bg-sw-ext.none,.bg-canvas-ext{background:repeating-conic-gradient(#E5E7EB 0 25%,#fff 0 50%) 0 0/12px 12px}
+    #bgColorExt{width:30px;height:30px;padding:0;border:2px solid var(--gray-200);border-radius:50%;background:none;cursor:pointer}
+    .bg-canvas-ext{display:none;max-width:100%;max-height:170px;margin:0 auto;border:1px solid var(--gray-200);border-radius:6px}
+    .bg-canvas-ext.show{display:block;animation:afrPop .25s ease}
+    .bg-dl-ext{display:flex;gap:6px}.bg-dl-ext .cs-dl{flex:1}
+    .au-row{display:flex;flex-wrap:wrap;gap:5px}
+    .au-fmt-ext{background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:7px;padding:4px 9px;font-size:.68rem;font-weight:700;color:var(--gray-700);cursor:pointer;font-family:inherit;transition:all .15s}
+    .au-fmt-ext:hover{border-color:var(--brand);color:var(--brand)}
+    .au-fmt-ext.active{background:var(--brand);border-color:var(--brand);color:#fff}
+    #auBrRowExt[hidden]{display:none}
     @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   </style>
 </head>
@@ -497,7 +511,8 @@
   <button class="tab-btn sub" data-tab="textex" tabindex="-1" aria-hidden="true">Text</button>
   <button class="tab-btn sub" data-tab="organizer" tabindex="-1" aria-hidden="true">Organizer</button>
   <button class="tab-btn sub" data-tab="resizer" tabindex="-1" aria-hidden="true">Resizer</button>
-  <button class="tab-btn sub" data-tab="unlock" tabindex="-1" aria-hidden="true">Unlock</button>
+  <button class="tab-btn sub" data-tab="bgremove" tabindex="-1" aria-hidden="true">BG</button>
+  <button class="tab-btn sub" data-tab="audio" tabindex="-1" aria-hidden="true">Audio</button>
   <span class="tab-ind" id="tabInd"></span>
 </div>
 
@@ -736,7 +751,8 @@
       <button type="button" class="tl-tile" data-go="textex"><span class="tl-ic">📝</span><b>PDF to Text</b><small>Copy or save text</small></button>
       <button type="button" class="tl-tile" data-go="organizer"><span class="tl-ic">🗂️</span><b>PDF Organizer</b><small>Reorder, rotate, shrink</small></button>
       <button type="button" class="tl-tile" data-go="resizer"><span class="tl-ic">📐</span><b>Photo &amp; Signature</b><small>Exact KB and pixels</small></button>
-      <button type="button" class="tl-tile" data-go="unlock"><span class="tl-ic">🔓</span><b>Unlock PDF</b><small>Remove a password you know, e.g. e-Aadhaar</small></button>
+      <button type="button" class="tl-tile" data-go="bgremove"><span class="tl-ic">🪄</span><b>Background Remover</b><small>Plain-wall photos</small></button>
+      <button type="button" class="tl-tile" data-go="audio"><span class="tl-ic">🎵</span><b>Audio Converter</b><small>MP3, WAV, M4A, OGG…</small></button>
     </div>
     <div class="tl-share">
       <div class="tl-share-title">💬 Share with friends</div>
@@ -794,21 +810,50 @@
   </div>
 </div>
 
-<div class="tab-panel" id="tab-unlock">
+<div class="tab-panel" id="tab-bgremove">
   <div class="tool-section tl-stack">
-    <div class="tool-title-ext">🔓 Unlock PDF</div>
-    <div class="tool-drop-ext" id="ulDropExt">
-      <input type="file" id="ulInExt" accept=".pdf,application/pdf"/>
-      <span class="tool-drop-icon">🔓</span>
-      <div class="tool-drop-text" id="ulDropTextExt">Drop a locked PDF here</div>
-      <div class="tool-drop-sub">Single PDF · Max 10MB</div>
+    <div class="tool-title-ext">🪄 Background Remover</div>
+    <div class="tool-drop-ext" id="bgDropExt">
+      <input type="file" id="bgInExt" accept="image/jpeg,image/png,image/webp"/>
+      <span class="tool-drop-icon">🪄</span>
+      <div class="tool-drop-text" id="bgDropTextExt">Drop a photo here</div>
+      <div class="tool-drop-sub">JPG, PNG, WebP · Max 10MB · stays on your device</div>
     </div>
-    <label class="cs-field">PDF password<input type="password" id="ulPassExt" autocomplete="off" placeholder="Enter the password"/></label>
-    <div class="cs-note">e-Aadhaar: first 4 letters of your name in CAPITALS + birth year (e.g. RAJE1990). e-PAN: date of birth as DDMMYYYY. Check your document's own instructions.</div>
-    <div class="cs-msg" id="ulMsgExt"></div>
-    <button class="btn-tool-ext" id="btnUlExt" disabled>Unlock PDF →</button>
-    <button class="cs-dl" id="btnUlDlExt" type="button">⬇ Download unlocked PDF</button>
-    <div class="cs-note">Your file and password are sent to our server over HTTPS to remove the lock. It needs the correct password and cannot recover one.</div>
+    <label class="cs-field">Sensitivity (higher removes more)<input type="range" id="bgTolExt" min="8" max="90" value="32"/></label>
+    <div class="bg-sw-row" id="bgSwExt" role="group" aria-label="New background">
+      <button type="button" class="bg-sw-ext none active" data-fill="transparent" title="Transparent" aria-label="Transparent"></button>
+      <button type="button" class="bg-sw-ext" data-fill="#FFFFFF" style="background:#fff" title="White" aria-label="White"></button>
+      <button type="button" class="bg-sw-ext" data-fill="#4A90D9" style="background:#4A90D9" title="Blue" aria-label="Blue"></button>
+      <button type="button" class="bg-sw-ext" data-fill="#D1D5DB" style="background:#D1D5DB" title="Grey" aria-label="Grey"></button>
+      <input type="color" id="bgColorExt" value="#ffffff" aria-label="Custom colour"/>
+    </div>
+    <canvas id="bgCanvasExt" class="bg-canvas-ext" aria-label="Result preview"></canvas>
+    <div class="cs-msg" id="bgMsgExt"></div>
+    <button class="btn-tool-ext" id="btnBgExt" disabled>Remove background →</button>
+    <div class="bg-dl-ext"><button class="cs-dl" id="btnBgPngExt" type="button">⬇ PNG</button><button class="cs-dl" id="btnBgJpgExt" type="button">⬇ JPG</button></div>
+    <div class="cs-note">Works best on a plain wall or sheet. For photos with busy backgrounds, use the Smart method on the <a href="https://allformatsready.vercel.app/#bg-remover" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">website →</a></div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-audio">
+  <div class="tool-section tl-stack">
+    <div class="tool-title-ext">🎵 Audio Converter</div>
+    <div class="tool-drop-ext" id="auDropExt">
+      <input type="file" id="auInExt" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.amr,.aiff,.webm,.mp4,.3gp"/>
+      <span class="tool-drop-icon">🎵</span>
+      <div class="tool-drop-text" id="auDropTextExt">Drop an audio file here</div>
+      <div class="tool-drop-sub">MP3, WAV, M4A, OGG, Opus, FLAC… · Max 20MB</div>
+    </div>
+    <div class="cs-field">Convert to
+      <div class="au-row" id="auFmtsExt" role="group" aria-label="Output format">
+        <button type="button" class="au-fmt-ext active" data-fmt="mp3">MP3</button><button type="button" class="au-fmt-ext" data-fmt="wav">WAV</button><button type="button" class="au-fmt-ext" data-fmt="m4a">M4A</button><button type="button" class="au-fmt-ext" data-fmt="aac">AAC</button><button type="button" class="au-fmt-ext" data-fmt="ogg">OGG</button><button type="button" class="au-fmt-ext" data-fmt="opus">Opus</button><button type="button" class="au-fmt-ext" data-fmt="flac">FLAC</button><button type="button" class="au-fmt-ext" data-fmt="wma">WMA</button>
+      </div>
+    </div>
+    <label class="cs-field" id="auBrRowExt">Quality<select id="auBrExt"><option value="64">64 kbps: smallest</option><option value="128" selected>128 kbps: standard</option><option value="192">192 kbps: high</option><option value="256">256 kbps: higher</option><option value="320">320 kbps: best</option></select></label>
+    <div class="cs-msg" id="auMsgExt"></div>
+    <button class="btn-tool-ext" id="btnAuExt" disabled>Convert audio →</button>
+    <button class="cs-dl" id="btnAuDlExt" type="button">⬇ Download audio</button>
+    <div class="cs-note">Audio is sent to our server to convert. The first conversion can take up to 30 seconds while the server wakes up.</div>
   </div>
 </div>
 

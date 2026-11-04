@@ -9,6 +9,7 @@ import subprocess
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -1197,54 +1198,102 @@ async def organize_pdf(
 
 
 # ══════════════════════════════════════════════
-# Unlock PDF: remove a password the user already knows
+# Audio converter (ffmpeg)
 # ══════════════════════════════════════════════
-@app.post("/unlock-pdf")
-@limiter.limit("5/minute")
-async def unlock_pdf(request: Request, file: UploadFile = File(...), password: str = Form("")):
-    """Remove the password from a PDF. The correct password is required; nothing is guessed or cracked."""
-    load_libs()
+MAX_AUDIO_SIZE = int(os.getenv("MAX_AUDIO_SIZE", str(20 * 1024 * 1024)))
+MAX_AUDIO_SECONDS = int(os.getenv("MAX_AUDIO_SECONDS", "1800"))
+AUDIO_TIMEOUT = int(os.getenv("AUDIO_TIMEOUT", "240"))
+AUDIO_FORMATS = {
+    "mp3":  {"args": ["-c:a", "libmp3lame"], "bitrate": True,  "mime": "audio/mpeg"},
+    "wav":  {"args": ["-c:a", "pcm_s16le"],  "bitrate": False, "mime": "audio/wav"},
+    "m4a":  {"args": ["-c:a", "aac"],        "bitrate": True,  "mime": "audio/mp4"},
+    "aac":  {"args": ["-c:a", "aac"],        "bitrate": True,  "mime": "audio/aac"},
+    "ogg":  {"args": ["-c:a", "libvorbis"],  "bitrate": True,  "mime": "audio/ogg"},
+    "opus": {"args": ["-c:a", "libopus"],    "bitrate": True,  "mime": "audio/ogg"},
+    "flac": {"args": ["-c:a", "flac"],       "bitrate": False, "mime": "audio/flac"},
+    "wma":  {"args": ["-c:a", "wmav2"],      "bitrate": True,  "mime": "audio/x-ms-wma"},
+}
+AUDIO_BITRATES = {64, 96, 128, 160, 192, 256, 320}
+
+
+def looks_like_audio(data: bytes) -> bool:
+    """Accept only known audio/media containers (blocks playlists and text files before ffmpeg sees them)."""
+    h = data[:16]
+    return bool(
+        h[:3] == b"ID3"
+        or (len(h) > 1 and h[0] == 0xFF and (h[1] & 0xE0) == 0xE0)          # MPEG audio / ADTS AAC
+        or (h[:4] == b"RIFF" and data[8:12] == b"WAVE")
+        or h[:4] in (b"OggS", b"fLaC", b"\x1aE\xdf\xa3", b"\x30\x26\xb2\x75")
+        or data[4:8] == b"ftyp"                                              # m4a / mp4 / 3gp
+        or h[:5] == b"#!AMR" or (h[:4] == b"FORM" and data[8:12] in (b"AIFF", b"AIFC"))
+    )
+
+
+def find_ffmpeg():
+    env = os.getenv("FFMPEG_BIN")
+    if env and os.path.exists(env):
+        return env
     try:
-        file_bytes = await read_upload(file)
-        if not file_bytes.startswith(b"%PDF-"):
-            raise InvalidUploadError("Please upload a PDF file.")
-        if len(password) > 128:
-            raise InvalidUploadError("That password is too long.")
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return shutil.which("ffmpeg")
+
+
+def convert_audio_bytes(data: bytes, fmt: str, bitrate: int = 128) -> bytes:
+    import tempfile
+    spec = AUDIO_FORMATS.get(fmt)
+    if not spec:
+        raise InvalidUploadError("Unsupported output format.")
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src, dst = os.path.join(tmp, "input.bin"), os.path.join(tmp, "output." + fmt)
+        with open(src, "wb") as fh:
+            fh.write(data)
+        cmd = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+               "-protocol_whitelist", "file", "-threads", "1", "-i", src,
+               "-vn", "-map_metadata", "-1", "-t", str(MAX_AUDIO_SECONDS), "-fs", str(60 * 1024 * 1024)] + spec["args"]
+        if spec["bitrate"]:
+            cmd += ["-b:a", f"{bitrate}k"]
+        cmd.append(dst)
         try:
-            doc = fitz_mod.open(stream=file_bytes, filetype="pdf")
-        except Exception as exc:
-            raise InvalidUploadError("Could not open this PDF. It may be damaged.") from exc
-        try:
-            notice = None
-            if doc.needs_pass:
-                if not password:
-                    raise InvalidUploadError("This PDF is password-protected. Please enter its password.")
-                if not doc.authenticate(password):
-                    raise InvalidUploadError("That password is not correct. Please check it and try again.")
-            else:
-                notice = "This PDF was not password-protected. Here is a clean copy."
-            if doc.page_count > MAX_PDF_PAGES:
-                raise InvalidUploadError(f"This PDF has more than {MAX_PDF_PAGES} pages, which is the maximum.")
-            buf = io.BytesIO()
-            doc.save(buf, garbage=3, deflate=True, encryption=fitz_mod.PDF_ENCRYPT_NONE)
-            out_bytes = buf.getvalue()
-            page_total = doc.page_count
-        finally:
-            doc.close()
-        out_bytes = validate_pdf_bytes(ensure_output(out_bytes, "PDF unlock"))
-        return JSONResponse(content={
-            "pdf": base64.b64encode(out_bytes).decode(),
-            "size_kb": round(len(out_bytes) / 1024, 1),
-            "pages": page_total,
-            "notice": notice,
-        })
+            proc = subprocess.run(cmd, capture_output=True, timeout=AUDIO_TIMEOUT, cwd=tmp)
+        except subprocess.TimeoutExpired as exc:
+            raise InvalidUploadError("This file took too long to convert. Try a shorter file.") from exc
+        if proc.returncode != 0 or not os.path.exists(dst) or os.path.getsize(dst) == 0:
+            logger.warning("ffmpeg failed: %s", proc.stderr[-300:].decode("utf-8", "replace"))
+            raise InvalidUploadError("Could not read this audio file. It may be damaged or in an unsupported format.")
+        with open(dst, "rb") as fh:
+            return fh.read()
+
+
+@app.post("/convert-audio")
+@limiter.limit("6/minute")
+async def convert_audio(request: Request, file: UploadFile = File(...), format: str = Form("mp3"), bitrate: int = Form(128)):
+    """Convert an audio file (MP3, WAV, M4A, OGG, OPUS, FLAC, WMA, AMR...) to another audio format."""
+    try:
+        data = await read_upload(file, max_size=MAX_AUDIO_SIZE)
+        fmt = (format or "mp3").lower().strip()
+        if fmt not in AUDIO_FORMATS:
+            raise InvalidUploadError("Choose one of: " + ", ".join(AUDIO_FORMATS) + ".")
+        if not looks_like_audio(data):
+            raise InvalidUploadError("This does not look like an audio file.")
+        if bitrate not in AUDIO_BITRATES:
+            bitrate = 128
+        out = await run_in_threadpool(convert_audio_bytes, data, fmt, bitrate)
+        return Response(content=out, media_type=AUDIO_FORMATS[fmt]["mime"])
     except InvalidUploadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except HTTPException:
         raise
+    except RuntimeError as exc:
+        logger.error("Audio conversion unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="Audio conversion is temporarily unavailable.") from exc
     except Exception:
-        logger.exception("PDF unlock failed")   # never log the password
-        raise HTTPException(status_code=422, detail="Could not unlock this PDF.")
+        logger.exception("Audio conversion failed")
+        raise HTTPException(status_code=422, detail="Could not convert this audio file.")
     finally:
         await file.close()
 
