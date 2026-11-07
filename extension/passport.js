@@ -92,6 +92,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if(ppImage){ initCropBox(); drawCropCanvas(); resetResult(); }
   });
 
+  document.getElementById("ppRemoveBg")?.addEventListener("change", e => {
+    if(!ppOrigFile) return;
+    if(e.target.checked) ppRunBg(); else if(ppOrigImg){ ppImage=ppOrigImg; initCropBox(); drawCropCanvas(); resetResult(); }
+  });
   document.getElementById("ppFillFrame")?.addEventListener("click", () => { if(ppImage){ ppFillFrame(); drawCropCanvas(); resetResult(); } });
 
   // ── File upload ──
@@ -130,6 +134,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function resetResult(){ document.getElementById("ppResultWrap").classList.remove("show"); window._ppOutCanvas=null; }
 
+let ppOrigImg=null, ppOrigFile=null;
+async function ppRunBg(){
+  if(!ppOrigFile) return;
+  const host=document.getElementById("ppCropWrap");
+  afrWorkStart(host,["Finding the person…","Cutting out the background…","Smoothing the edges…"]);
+  try{
+    const fd=new FormData(); fd.append("file",ppOrigFile);
+    const r=await fetch(`${API_URL}/remove-bg`,{method:"POST",body:fd});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"Could not remove the background."); }
+    const method=r.headers.get("X-BG-Method"), url=URL.createObjectURL(await r.blob()), img=new Image();
+    await new Promise((ok,bad)=>{ img.onload=ok; img.onerror=bad; img.src=url; });
+    ppImage=img; initCropBox(); drawCropCanvas(); resetResult();
+    afrToast(method==="basic"?"🪄 Background replaced (basic mode)":"🪄 Background replaced","ok");
+  }catch(err){
+    afrToast("⚠️ "+(err.message||"Background removal failed"),"err");
+    const cb=document.getElementById("ppRemoveBg"); if(cb) cb.checked=false;
+    if(ppOrigImg){ ppImage=ppOrigImg; initCropBox(); drawCropCanvas(); resetResult(); }
+  }finally{ afrWorkStop(host); }
+}
 function loadPPImage(file){
   const ext=(file.name||"").split(".").pop().toLowerCase();
   if(["heic","heif"].includes(ext)){
@@ -142,7 +165,8 @@ function loadPPImage(file){
     const img=new Image();
     img.onerror=()=>alert("Could not read this image. Use JPG, PNG or WebP.");
     img.onload=()=>{
-      ppImage=img; ppZoom=1.0;
+      ppImage=img; ppOrigImg=img; ppOrigFile=file; ppZoom=1.0;
+      setTimeout(()=>{ if(document.getElementById("ppRemoveBg")?.checked) ppRunBg(); },0);
       const zs=document.getElementById("ppZoomSlider");
       const zv=document.getElementById("ppZoomVal");
       if(zs) zs.value=100; if(zv) zv.textContent="100%";

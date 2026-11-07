@@ -1,5 +1,7 @@
 import os
 import io
+import threading
+import time
 import re
 import base64
 import logging
@@ -46,6 +48,7 @@ def load_libs():
 @asynccontextmanager
 async def lifespan(app):
     load_libs()
+    start_bg_model_loading()   # fetch the background-removal model in the background
     yield
 
 # Rate limiter — max 10 requests per minute per IP
@@ -1212,6 +1215,7 @@ AUDIO_FORMATS = {
     "opus": {"args": ["-c:a", "libopus"],    "bitrate": True,  "mime": "audio/ogg"},
     "flac": {"args": ["-c:a", "flac"],       "bitrate": False, "mime": "audio/flac"},
     "wma":  {"args": ["-c:a", "wmav2"],      "bitrate": True,  "mime": "audio/x-ms-wma"},
+    "mp4":  {"args": ["-c:a", "aac"],        "bitrate": True,  "mime": "audio/mp4"},
 }
 AUDIO_BITRATES = {64, 96, 128, 160, 192, 256, 320}
 
@@ -1294,6 +1298,197 @@ async def convert_audio(request: Request, file: UploadFile = File(...), format: 
     except Exception:
         logger.exception("Audio conversion failed")
         raise HTTPException(status_code=422, detail="Could not convert this audio file.")
+    finally:
+        await file.close()
+
+
+# ══════════════════════════════════════════════
+# Background remover: AI model (U²-Net "silueta" via ONNX) with an OpenCV fallback
+# ══════════════════════════════════════════════
+BG_MODEL_URL = os.getenv("BG_MODEL_URL", "https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx")
+BG_MODEL_MD5 = os.getenv("BG_MODEL_MD5", "55e59e0d8062d2f5d013f4725ee84782")
+BG_MODEL_DIR = os.getenv("BG_MODEL_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "models"))
+BG_MAX_SIDE = int(os.getenv("BG_MAX_SIDE", "1600"))
+_bg_state = {"session": None, "state": "idle", "failed_at": 0.0}
+_bg_lock = threading.Lock()
+
+
+def _bg_prepare():
+    """Download (once) and load the model. Runs in a background thread so requests never wait for it."""
+    try:
+        import hashlib
+        import urllib.request
+        import onnxruntime as ort
+        os.makedirs(BG_MODEL_DIR, exist_ok=True)
+        path = os.path.join(BG_MODEL_DIR, "silueta.onnx")
+
+        def md5_ok(p):
+            if not os.path.exists(p):
+                return False
+            h = hashlib.md5()
+            with open(p, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(chunk)
+            return h.hexdigest() == BG_MODEL_MD5
+
+        if not md5_ok(path):
+            tmp = path + ".part"
+            with urllib.request.urlopen(BG_MODEL_URL, timeout=120) as resp, open(tmp, "wb") as out:
+                shutil.copyfileobj(resp, out)
+            if not md5_ok(tmp):
+                os.remove(tmp)
+                raise RuntimeError("background model checksum mismatch")
+            os.replace(tmp, path)
+        opts = ort.SessionOptions()
+        opts.intra_op_num_threads = int(os.getenv("BG_THREADS", "2"))
+        _bg_state["session"] = ort.InferenceSession(path, sess_options=opts, providers=["CPUExecutionProvider"])
+        _bg_state["state"] = "ready"
+        logger.info("Background model ready")
+    except Exception:
+        logger.exception("Background model unavailable; using the OpenCV fallback")
+        _bg_state["state"] = "failed"
+        _bg_state["failed_at"] = time.time()
+
+
+def start_bg_model_loading():
+    with _bg_lock:
+        state = _bg_state["state"]
+        if state == "loading" or state == "ready":
+            return
+        if state == "failed" and time.time() - _bg_state["failed_at"] < 300:
+            return
+        _bg_state["state"] = "loading"
+    threading.Thread(target=_bg_prepare, daemon=True).start()
+
+
+def get_bg_session():
+    if _bg_state["state"] == "ready":
+        return _bg_state["session"]
+    start_bg_model_loading()
+    return None
+
+
+def u2net_mask(session, img):
+    """Salient-object mask from a U²-Net style ONNX session, same pre/post-processing as rembg."""
+    import numpy as np
+    from PIL import Image
+    arr = np.asarray(img.convert("RGB").resize((320, 320), Image.LANCZOS), dtype=np.float32)
+    arr = arr / max(float(arr.max()), 1e-6)
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    arr = ((arr - mean) / std).transpose(2, 0, 1)[None].astype(np.float32)
+    out = session.run(None, {session.get_inputs()[0].name: arr})[0][:, 0, :, :]
+    lo, hi = float(out.min()), float(out.max())
+    pred = np.squeeze((out - lo) / max(hi - lo, 1e-6))
+    return Image.fromarray((pred * 255).astype("uint8"), "L").resize(img.size, Image.LANCZOS)
+
+
+def grabcut_mask(img):
+    """Fallback: portrait-aware GrabCut (uses a face to place the body), pure OpenCV."""
+    import cv2
+    import numpy as np
+    from PIL import Image
+    w, h = img.size
+    s = min(1.0, 640.0 / max(w, h))
+    small = cv2.cvtColor(np.asarray(img.convert("RGB").resize((max(1, int(w * s)), max(1, int(h * s))), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
+    sh, sw = small.shape[:2]
+    mask = np.full((sh, sw), cv2.GC_PR_BGD, np.uint8)
+    edge = max(2, int(0.02 * min(sw, sh)))
+    mask[:edge, :] = cv2.GC_BGD; mask[:, :edge] = cv2.GC_BGD; mask[:, -edge:] = cv2.GC_BGD
+    face = None
+    try:
+        cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        faces = cascade.detectMultiScale(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), 1.1, 5, minSize=(max(24, sw // 16), max(24, sw // 16)))
+        if len(faces):
+            face = max(faces, key=lambda f: f[2] * f[3])
+    except Exception:
+        face = None
+    if face is not None:
+        fx, fy, fw, fh = [int(v) for v in face]
+        x0, x1 = max(edge, fx - int(1.3 * fw)), min(sw - edge, fx + fw + int(1.3 * fw))
+        mask[max(edge, fy - int(0.5 * fh)):sh, x0:x1] = cv2.GC_PR_FGD
+        mask[fy + int(0.2 * fh):fy + int(0.85 * fh), fx + int(0.2 * fw):fx + int(0.8 * fw)] = cv2.GC_FGD
+    else:
+        mask[int(0.08 * sh):sh, int(0.12 * sw):int(0.88 * sw)] = cv2.GC_PR_FGD
+        mask[int(0.3 * sh):int(0.8 * sh), int(0.35 * sw):int(0.65 * sw)] = cv2.GC_FGD
+    bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+    cv2.grabCut(small, mask, None, bgd, fgd, 6, cv2.GC_INIT_WITH_MASK)
+    fg = ((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(fg, 8)
+    if n > 1:
+        cy, cx = sh // 2, sw // 2
+        keep = max(range(1, n), key=lambda i: stats[i, cv2.CC_STAT_AREA] * (2 if labels[cy, cx] == i else 1))
+        fg = (labels == keep).astype(np.uint8)
+    k = max(3, int(0.012 * max(sw, sh)) | 1)
+    fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    cnts, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    fg = np.zeros_like(fg); cv2.drawContours(fg, cnts, -1, 1, thickness=-1)
+    soft = cv2.GaussianBlur(fg * 255, (0, 0), 1.4)
+    return Image.fromarray(soft, "L").resize(img.size, Image.LANCZOS)
+
+
+def refine_mask(mask):
+    """Tighten soft edges, drop tiny specks and smooth the outline."""
+    import cv2
+    import numpy as np
+    from PIL import Image
+    a = np.asarray(mask, dtype=np.float32) / 255.0
+    a = np.clip((a - 0.12) / 0.76, 0.0, 1.0)
+    solid = (a > 0.5).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(solid, 8)
+    if n > 2:
+        min_area = 0.004 * solid.size
+        for i in range(1, n):
+            if stats[i, cv2.CC_STAT_AREA] < min_area:
+                a[labels == i] = 0.0
+    a = cv2.GaussianBlur(a, (0, 0), 0.9)
+    return Image.fromarray((np.clip(a, 0, 1) * 255).astype("uint8"), "L")
+
+
+def remove_background_bytes(data: bytes):
+    """Return (png_bytes, method) where method is 'ai' or 'basic'."""
+    from PIL import Image, ImageOps
+    try:
+        img = Image.open(io.BytesIO(data)); img.load()
+    except Exception as exc:
+        raise InvalidUploadError("Could not read this image. Use JPG, PNG or WebP.") from exc
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    if img.width * img.height > MAX_IMAGE_PIXELS:
+        raise InvalidUploadError("This image is too large to process.")
+    if max(img.size) > BG_MAX_SIDE:
+        s = BG_MAX_SIDE / float(max(img.size))
+        img = img.resize((max(1, int(img.width * s)), max(1, int(img.height * s))), Image.LANCZOS)
+    mask, method = None, "basic"
+    session = get_bg_session()
+    if session is not None:
+        try:
+            mask, method = u2net_mask(session, img), "ai"
+        except Exception:
+            logger.exception("AI background removal failed; falling back")
+    if mask is None:
+        mask = grabcut_mask(img)
+    mask = refine_mask(mask)
+    rgba = img.convert("RGBA"); rgba.putalpha(mask)
+    buf = io.BytesIO(); rgba.save(buf, format="PNG", optimize=False, compress_level=3)
+    return buf.getvalue(), method
+
+
+@app.post("/remove-bg")
+@limiter.limit("8/minute")
+async def remove_bg(request: Request, file: UploadFile = File(...)):
+    """Cut the person/subject out of a photo and return a transparent PNG."""
+    try:
+        data = await read_upload(file)
+        png, method = await run_in_threadpool(remove_background_bytes, data)
+        return Response(content=png, media_type="image/png",
+                        headers={"X-BG-Method": method, "Access-Control-Expose-Headers": "X-BG-Method"})
+    except InvalidUploadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Background removal failed")
+        raise HTTPException(status_code=422, detail="Could not remove the background from this image.")
     finally:
         await file.close()
 

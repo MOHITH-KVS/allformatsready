@@ -741,6 +741,37 @@ document.addEventListener("click",e=>{
   if(c) afrBtnOk(c,"✅ Copied!");
 });
 
+// ── Working feedback: busy tools get a moving bar, bouncing dots and rotating status lines ──
+const WORK_LINES=["Reading your file…","Working on it…","Optimising the result…","Almost there…"];
+function afrWorkStart(host,lines,quiet){
+  if(!host||host.classList.contains("is-working")) return;
+  host.classList.add("is-working"); host.setAttribute("aria-busy","true");
+  const strip=document.createElement("div"); strip.className="work-strip"; strip.setAttribute("aria-hidden","true"); strip.innerHTML="<i></i>"; host.prepend(strip);
+  if(quiet) return;
+  const L=lines&&lines.length?lines:WORK_LINES, st=document.createElement("div"); st.className="work-status"; st.setAttribute("role","status");
+  st.innerHTML='<span class="work-dots" aria-hidden="true"><b></b><b></b><b></b></span><span class="work-text"></span>';
+  const btn=host.querySelector(".btn-tool-ext,.btn-convert"); if(btn) btn.before(st); else host.append(st);
+  const t=st.querySelector(".work-text"); let i=0; t.textContent=L[0];
+  host._workTimer=setInterval(()=>{ i=(i+1)%L.length; t.textContent=L[i]; },1700);
+}
+function afrWorkStop(host){
+  if(!host||!host.classList.contains("is-working")) return;
+  clearInterval(host._workTimer); host.classList.remove("is-working"); host.removeAttribute("aria-busy");
+  host.querySelectorAll(":scope > .work-strip, .work-status").forEach(n=>n.remove());
+}
+document.querySelectorAll(".btn-tool-ext,.btn-pp-generate").forEach(b=>new MutationObserver(()=>{
+  const host=b.closest(".tool-section"); if(!host) return;
+  (/…\s*$/.test(b.textContent||"")||b.classList.contains("is-loading")) ? afrWorkStart(host) : afrWorkStop(host);
+}).observe(b,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:["class"]}));
+(function(){
+  const pw=document.getElementById("progressWrap"), up=document.getElementById("uploadSection"); if(!pw||!up) return;
+  new MutationObserver(()=>{ pw.classList.contains("show") ? afrWorkStart(up,null,true) : afrWorkStop(up); }).observe(pw,{attributes:true,attributeFilter:["class"]});
+})();
+document.querySelectorAll(".tool-prog-ext,.tool-progress-ext").forEach(p=>new MutationObserver(()=>{
+  const host=p.closest(".tool-section"); if(!host) return;
+  p.classList.contains("show") ? afrWorkStart(host) : afrWorkStop(host);
+}).observe(p,{attributes:true,attributeFilter:["class"]}));
+
 // ── Success celebration (confetti burst) ──
 function afrCelebrate(){
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -877,7 +908,9 @@ function afrCelebrate(){
 
   // ───── Background Remover (on device, plain-background method) ─────
   const bgIn=$("bgInExt"), bgTol=$("bgTolExt"), bgSw=$("bgSwExt"), bgColor=$("bgColorExt"), bgCanvas=$("bgCanvasExt"), bgMsg=$("bgMsgExt"), btnBg=$("btnBgExt"), btnPng=$("btnBgPngExt"), btnJpg=$("btnBgJpgExt");
-  let bgImg=null, bgName="photo", bgCut=null, bgFill="transparent";
+  let bgImg=null, bgFile=null, bgName="photo", bgCut=null, bgFill="transparent";
+  const bgMode=$("bgModeExt"), bgTolRow=$("bgTolRowExt");
+  bgMode.addEventListener("change",()=>{ bgTolRow.hidden=bgMode.value!=="plain"; });
   function bgPlain(img,tol){
     const s=Math.min(1,1600/Math.max(img.width,img.height)), c=document.createElement("canvas"); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
     const x=c.getContext("2d",{willReadFrequently:true}); x.drawImage(img,0,0,c.width,c.height);
@@ -924,19 +957,35 @@ function afrCelebrate(){
     if(!f) return;
     if(!isImg(f)){ say(bgMsg,"Please choose a JPG, PNG or WebP image.","err"); bgIn.value=""; return; }
     if(f.size>MAXB){ say(bgMsg,"File is larger than 10MB.","err"); bgIn.value=""; return; }
-    try{ bgImg=await loadImg(f); bgName=base(f.name); $("bgDropTextExt").textContent="🪄 "+f.name; btnBg.disabled=false; }catch(e){ say(bgMsg,e.message,"err"); }
+    try{ bgImg=await loadImg(f); bgFile=f; bgName=base(f.name); $("bgDropTextExt").textContent="🪄 "+f.name; btnBg.disabled=false; }catch(e){ say(bgMsg,e.message,"err"); }
   });
-  btnBg.addEventListener("click",()=>{
+  async function bgSmart(file){
+    const fd=new FormData(); fd.append("file",file);
+    const r=await fetch(`${API_URL}/remove-bg`,{method:"POST",body:fd});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"The server could not process this photo."); }
+    const method=r.headers.get("X-BG-Method")||"ai", img=await loadImg(await r.blob());
+    const c=document.createElement("canvas"); c.width=img.width; c.height=img.height; c.getContext("2d").drawImage(img,0,0);
+    return {canvas:c, method};
+  }
+  btnBg.addEventListener("click",async()=>{
     if(!bgImg) return; bgMsg.className="cs-msg"; btnBg.disabled=true; btnBg.classList.add("is-loading"); btnBg.textContent="Working…";
-    setTimeout(()=>{
-      try{
-        const r=bgPlain(bgImg,+bgTol.value); bgCut=r.canvas; bgRender(); btnPng.classList.add("show"); btnJpg.classList.add("show");
-        if(r.share>0.97) say(bgMsg,"Almost the whole picture was removed. Lower the Sensitivity.","err");
-        else if(r.share<0.01) say(bgMsg,"No plain background found. Raise the Sensitivity, or use the website's Smart method.","err");
-        else { say(bgMsg,`✅ ${bgCut.width}×${bgCut.height} px`,"ok"); afrToast("🪄 Background removed","ok"); afrCelebrate(); }
-      }catch(err){ say(bgMsg,err.message||"Could not process this image.","err"); }
-      btnBg.disabled=false; btnBg.classList.remove("is-loading"); btnBg.textContent="Remove background →";
-    },30);
+    const host=btnBg.closest(".tool-section");
+    if(bgMode.value==="ai") afrWorkStart(host,["Finding the person…","Cutting out the background…","Smoothing the edges…"]);
+    try{
+      let note="", good=true;
+      if(bgMode.value==="ai"){
+        try{ const r=await bgSmart(bgFile); bgCut=r.canvas; if(r.method==="basic"){ note="The AI model was not ready on the server yet, so a basic cutout was used. Try again in a minute."; good=false; } }
+        catch(err){ const r=bgPlain(bgImg,+bgTol.value); bgCut=r.canvas; note="Could not reach the server, so the plain-background method was used."; good=false; }
+      } else {
+        const r=bgPlain(bgImg,+bgTol.value); bgCut=r.canvas;
+        if(r.share>0.97){ note="Almost the whole picture was removed. Lower the Sensitivity."; good=false; }
+        else if(r.share<0.01){ note="No plain background found. Raise the Sensitivity, or use Smart mode."; good=false; }
+      }
+      bgRender(); btnPng.classList.add("show"); btnJpg.classList.add("show");
+      say(bgMsg,`${good?"✅":"⚠️"} ${bgCut.width}×${bgCut.height} px`+(note?" — "+note:""),good?"ok":"err");
+      if(good){ afrToast("🪄 Background removed","ok"); afrCelebrate(); }
+    }catch(err){ say(bgMsg,err.message||"Could not process this image.","err"); }
+    finally{ afrWorkStop(host); btnBg.disabled=false; btnBg.classList.remove("is-loading"); btnBg.textContent="Remove background →"; }
   });
   btnPng.addEventListener("click",()=>{ const c=bgCompose(false); if(c) c.toBlob(b=>save(b,bgName+"_no-bg.png"),"image/png"); });
   btnJpg.addEventListener("click",()=>{ const c=bgCompose(true); if(c) c.toBlob(b=>save(b,bgName+"_bg.jpg"),"image/jpeg",0.95); });
@@ -949,7 +998,7 @@ function afrCelebrate(){
   auIn.addEventListener("change",()=>{
     const f=auIn.files[0]; auBlob=null; auDl.classList.remove("show"); auMsg.className="cs-msg"; btnAu.disabled=true; auFile=null;
     if(!f) return;
-    if(!(/^audio\//.test(f.type)||/\.(mp3|wav|m4a|aac|ogg|opus|flac|wma|amr|aiff?|webm|mp4|3gp)$/i.test(f.name))){ say(auMsg,"Please choose an audio file.","err"); auIn.value=""; return; }
+    if(!(/^(audio|video)\//.test(f.type)||/\.(mp3|wav|m4a|aac|ogg|opus|flac|wma|amr|aiff?|webm|mp4|mov|mkv|3gp)$/i.test(f.name))){ say(auMsg,"Please choose an audio file.","err"); auIn.value=""; return; }
     if(f.size>AUMAX){ say(auMsg,"File is larger than 20MB.","err"); auIn.value=""; return; }
     auFile=f; auName=base(f.name); $("auDropTextExt").textContent="🎵 "+f.name+" ("+fmtSize(f.size)+")"; btnAu.disabled=false;
   });
