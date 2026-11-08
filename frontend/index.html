@@ -1190,7 +1190,7 @@ function de(){ ppDragging=false; }
     .hero-grid > .hg-pills{grid-area:pills;justify-content:flex-start}
     .hero-grid > .hg-upload{grid-area:upload;max-width:none;margin:0;padding:0}
     .hero-grid .finder-chips{justify-content:flex-start}
-    @media(max-width:999px){
+    @media(max-width:1099px){
       .hero.hero-grid{display:flex;flex-direction:column;gap:12px;text-align:center;padding:18px 16px 6px;max-width:640px}
       .hero-grid > .hg-title{order:1;font-size:clamp(1.55rem,6.5vw,2.1rem)}.hero-grid > .hg-sub{order:2;font-size:.92rem}
       .hero-grid > .hg-upload{order:3}.hero-grid > .hg-finder{order:4}.hero-grid > .hg-promo{order:5}.hero-grid > .hg-pills{order:6;justify-content:center}
@@ -1234,6 +1234,17 @@ function de(){ ppDragging=false; }
     .pp-ai-row input{width:16px;height:16px;accent-color:var(--brand)}
     #ppWebCanvasWrap.is-working .work-status{position:absolute;left:10px;right:10px;bottom:10px;z-index:6}
     @media (prefers-reduced-motion:reduce){.work-strip i,.work-dots b,.is-working .tool-drop-icon,.is-working .drop-icon,.is-working .btn-tool{animation:none}}
+
+    /* Desktop: the upload card stretches to the full hero height, with the drop zone filling it */
+    @media(min-width:1100px){
+      .hero-grid > .hg-upload{align-self:stretch;display:flex}
+      .hero-grid > .hg-upload > .card{flex:1;display:flex;flex-direction:column;width:100%}
+      .hero-grid > .hg-upload .drop-zone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+      .hero-grid > .hg-upload .drop-icon{font-size:3.6rem;margin-bottom:6px}
+      .hero-grid > .hg-upload .drop-title{font-size:1.3rem}
+      .hero-grid > .hg-upload .drop-sub{font-size:.9rem;max-width:380px}
+      .hero-grid > .hg-upload .drop-formats{margin-top:10px}
+    }
 
     /* Mask tool guidance */
     .mk-steps{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
