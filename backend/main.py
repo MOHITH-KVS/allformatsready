@@ -1305,9 +1305,19 @@ async def convert_audio(request: Request, file: UploadFile = File(...), format: 
 # ══════════════════════════════════════════════
 # Background remover: AI model (U²-Net "silueta" via ONNX) with an OpenCV fallback
 # ══════════════════════════════════════════════
-BG_MODEL_URL = os.getenv("BG_MODEL_URL", "https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx")
-BG_MODEL_MD5 = os.getenv("BG_MODEL_MD5", "55e59e0d8062d2f5d013f4725ee84782")
+BG_MODELS = {
+    # name: download URL, md5 ("" = skip the check), network input size, normalisation std
+    "silueta": {"url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx",
+                "md5": "55e59e0d8062d2f5d013f4725ee84782", "size": 320, "std": (0.229, 0.224, 0.225)},
+    "isnet-general-use": {"url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+                          "md5": "", "size": 1024, "std": (1.0, 1.0, 1.0)},
+}
+BG_MODEL = os.getenv("BG_MODEL", "silueta") if os.getenv("BG_MODEL", "silueta") in BG_MODELS else "silueta"
+BG_MODEL_URL = os.getenv("BG_MODEL_URL", BG_MODELS[BG_MODEL]["url"])
+BG_MODEL_MD5 = os.getenv("BG_MODEL_MD5", BG_MODELS[BG_MODEL]["md5"])
 BG_MODEL_DIR = os.getenv("BG_MODEL_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "models"))
+# The AI model needs far more memory than a free 512 MB server has. It is OFF unless ENABLE_BG_AI=1 is set (use a bigger server or the separate bg-space service instead).
+BG_ENABLED = os.getenv("ENABLE_BG_AI", "0").strip() == "1"
 BG_MAX_SIDE = int(os.getenv("BG_MAX_SIDE", "1600"))
 _bg_state = {"session": None, "state": "idle", "failed_at": 0.0}
 _bg_lock = threading.Lock()
@@ -1320,11 +1330,13 @@ def _bg_prepare():
         import urllib.request
         import onnxruntime as ort
         os.makedirs(BG_MODEL_DIR, exist_ok=True)
-        path = os.path.join(BG_MODEL_DIR, "silueta.onnx")
+        path = os.path.join(BG_MODEL_DIR, BG_MODEL + ".onnx")
 
         def md5_ok(p):
             if not os.path.exists(p):
                 return False
+            if not BG_MODEL_MD5:
+                return os.path.getsize(p) > 1_000_000
             h = hashlib.md5()
             with open(p, "rb") as fh:
                 for chunk in iter(lambda: fh.read(1 << 20), b""):
@@ -1351,6 +1363,8 @@ def _bg_prepare():
 
 
 def start_bg_model_loading():
+    if not BG_ENABLED:
+        return
     with _bg_lock:
         state = _bg_state["state"]
         if state == "loading" or state == "ready":
@@ -1369,13 +1383,15 @@ def get_bg_session():
 
 
 def u2net_mask(session, img):
-    """Salient-object mask from a U²-Net style ONNX session, same pre/post-processing as rembg."""
+    """Salient-object mask from a U²-Net / IS-Net ONNX session, same pre/post-processing as rembg."""
     import numpy as np
     from PIL import Image
-    arr = np.asarray(img.convert("RGB").resize((320, 320), Image.LANCZOS), dtype=np.float32)
+    cfg = BG_MODELS[BG_MODEL]
+    side = cfg["size"]
+    arr = np.asarray(img.convert("RGB").resize((side, side), Image.LANCZOS), dtype=np.float32)
     arr = arr / max(float(arr.max()), 1e-6)
     mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    std = np.array(cfg["std"], dtype=np.float32)
     arr = ((arr - mean) / std).transpose(2, 0, 1)[None].astype(np.float32)
     out = session.run(None, {session.get_inputs()[0].name: arr})[0][:, 0, :, :]
     lo, hi = float(out.min()), float(out.max())
@@ -1383,8 +1399,45 @@ def u2net_mask(session, img):
     return Image.fromarray((pred * 255).astype("uint8"), "L").resize(img.size, Image.LANCZOS)
 
 
+def _saliency(small_bgr):
+    """Spectral-residual saliency (no extra libraries): where does the eye go?"""
+    import cv2
+    import numpy as np
+    g = cv2.resize(cv2.cvtColor(small_bgr, cv2.COLOR_BGR2GRAY), (128, 128)).astype(np.float32)
+    f = np.fft.fft2(g)
+    log_amp = np.log(np.abs(f) + 1e-6)
+    resid = log_amp - cv2.blur(log_amp, (3, 3))
+    s = np.abs(np.fft.ifft2(np.exp(resid + 1j * np.angle(f)))) ** 2
+    s = cv2.GaussianBlur(s.astype(np.float32), (0, 0), 3)
+    s = (s - s.min()) / max(float(s.max() - s.min()), 1e-6)
+    return cv2.resize(s, (small_bgr.shape[1], small_bgr.shape[0]))
+
+
+def _border_distance(small_bgr):
+    """How different is each pixel from the colours found along the picture's edge? (<1 = looks like background)"""
+    import cv2
+    import numpy as np
+    lab = cv2.cvtColor(small_bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+    h, w = lab.shape[:2]
+    bw = max(3, int(0.03 * min(h, w)))
+    strips = np.concatenate([lab[:bw].reshape(-1, 3), lab[-bw:].reshape(-1, 3), lab[:, :bw].reshape(-1, 3), lab[:, -bw:].reshape(-1, 3)])
+    k = 3 if len(strips) > 300 else 1
+    _, labels, centers = cv2.kmeans(strips, k, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0), 2, cv2.KMEANS_PP_CENTERS)
+    labels = labels.ravel()
+    dists = []
+    for i in range(k):
+        members = strips[labels == i]
+        if len(members) < 0.08 * len(strips):
+            continue            # a small colour patch on the edge is probably the subject touching the border
+        spread = max(6.0, float(np.linalg.norm(members - centers[i], axis=1).mean()) * 2.0)
+        dists.append(np.linalg.norm(lab - centers[i], axis=2) / spread)
+    if not dists:
+        return np.ones((h, w), np.float32) * 2.0
+    return np.min(np.stack(dists), axis=0)
+
+
 def grabcut_mask(img):
-    """Fallback: portrait-aware GrabCut (uses a face to place the body), pure OpenCV."""
+    """Fallback for any subject: edge-colour model + saliency seed GrabCut (portrait-aware when a face is found)."""
     import cv2
     import numpy as np
     from PIL import Image
@@ -1392,61 +1445,106 @@ def grabcut_mask(img):
     s = min(1.0, 640.0 / max(w, h))
     small = cv2.cvtColor(np.asarray(img.convert("RGB").resize((max(1, int(w * s)), max(1, int(h * s))), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
     sh, sw = small.shape[:2]
-    mask = np.full((sh, sw), cv2.GC_PR_BGD, np.uint8)
-    edge = max(2, int(0.02 * min(sw, sh)))
-    mask[:edge, :] = cv2.GC_BGD; mask[:, :edge] = cv2.GC_BGD; mask[:, -edge:] = cv2.GC_BGD
     face = None
     try:
         cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-        faces = cascade.detectMultiScale(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), 1.1, 5, minSize=(max(24, sw // 16), max(24, sw // 16)))
+        faces = cascade.detectMultiScale(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), 1.1, 5, minSize=(max(24, sw // 12), max(24, sw // 12)))
         if len(faces):
             face = max(faces, key=lambda f: f[2] * f[3])
     except Exception:
         face = None
+    mask = np.full((sh, sw), cv2.GC_PR_BGD, np.uint8)
+    edge = max(2, int(0.02 * min(sw, sh)))
     if face is not None:
+        mask[:edge, :] = cv2.GC_BGD; mask[:, :edge] = cv2.GC_BGD; mask[:, -edge:] = cv2.GC_BGD
         fx, fy, fw, fh = [int(v) for v in face]
         x0, x1 = max(edge, fx - int(1.3 * fw)), min(sw - edge, fx + fw + int(1.3 * fw))
         mask[max(edge, fy - int(0.5 * fh)):sh, x0:x1] = cv2.GC_PR_FGD
         mask[fy + int(0.2 * fh):fy + int(0.85 * fh), fx + int(0.2 * fw):fx + int(0.8 * fw)] = cv2.GC_FGD
     else:
-        mask[int(0.08 * sh):sh, int(0.12 * sw):int(0.88 * sw)] = cv2.GC_PR_FGD
-        mask[int(0.3 * sh):int(0.8 * sh), int(0.35 * sw):int(0.65 * sw)] = cv2.GC_FGD
+        d = _border_distance(small)
+        sal = _saliency(small)
+        bgish = (d < 1.0).astype(np.uint8)
+        n, lbl = cv2.connectedComponents(bgish, connectivity=4)
+        touching = set(np.unique(np.concatenate([lbl[0], lbl[-1], lbl[:, 0], lbl[:, -1]]))) - {0}
+        sure_bg = np.isin(lbl, list(touching)) & (bgish == 1) if touching else np.zeros((sh, sw), bool)
+        mask[(d > 1.6) & (sal > 0.25)] = cv2.GC_PR_FGD
+        centre = np.zeros((sh, sw), bool); centre[int(0.15 * sh):int(0.85 * sh), int(0.15 * sw):int(0.85 * sw)] = True
+        mask[(d > 2.4) & (sal > 0.5) & centre] = cv2.GC_FGD
+        mask[sure_bg] = cv2.GC_BGD
+        if int(((mask == cv2.GC_PR_FGD) | (mask == cv2.GC_FGD)).sum()) < 0.005 * sh * sw:
+            mask[:] = cv2.GC_PR_BGD
+            mask[int(0.08 * sh):int(0.92 * sh), int(0.08 * sw):int(0.92 * sw)] = cv2.GC_PR_FGD
+            mask[int(0.3 * sh):int(0.7 * sh), int(0.3 * sw):int(0.7 * sw)] = cv2.GC_FGD
     bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
     cv2.grabCut(small, mask, None, bgd, fgd, 6, cv2.GC_INIT_WITH_MASK)
     fg = ((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)).astype(np.uint8)
     n, labels, stats, _ = cv2.connectedComponentsWithStats(fg, 8)
     if n > 1:
-        cy, cx = sh // 2, sw // 2
-        keep = max(range(1, n), key=lambda i: stats[i, cv2.CC_STAT_AREA] * (2 if labels[cy, cx] == i else 1))
-        fg = (labels == keep).astype(np.uint8)
-    k = max(3, int(0.012 * max(sw, sh)) | 1)
+        biggest = max(stats[i, cv2.CC_STAT_AREA] for i in range(1, n))
+        keep = [i for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] >= 0.15 * biggest]
+        fg = np.isin(labels, keep).astype(np.uint8)
+    k = max(3, int(0.01 * max(sw, sh)) | 1)
     fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-    cnts, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    fg = np.zeros_like(fg); cv2.drawContours(fg, cnts, -1, 1, thickness=-1)
-    soft = cv2.GaussianBlur(fg * 255, (0, 0), 1.4)
+    cnts, hier = cv2.findContours(fg, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    out = np.zeros_like(fg)
+    for i, c in enumerate(cnts):                      # fill small holes, keep big ones (handles, gaps)
+        is_hole = hier[0][i][3] != -1
+        if not is_hole:
+            cv2.drawContours(out, [c], -1, 1, thickness=-1)
+    for i, c in enumerate(cnts):
+        if hier[0][i][3] != -1 and cv2.contourArea(c) > 0.004 * sh * sw:
+            cv2.drawContours(out, [c], -1, 0, thickness=-1)
+    soft = cv2.GaussianBlur(out * 255, (0, 0), 1.2)
     return Image.fromarray(soft, "L").resize(img.size, Image.LANCZOS)
 
 
-def refine_mask(mask):
-    """Tighten soft edges, drop tiny specks and smooth the outline."""
+def _guided_filter(guide, src, radius, eps):
+    import cv2
+    k = (radius * 2 + 1, radius * 2 + 1)
+    mean_i, mean_p = cv2.boxFilter(guide, -1, k), cv2.boxFilter(src, -1, k)
+    var_i = cv2.boxFilter(guide * guide, -1, k) - mean_i * mean_i
+    cov_ip = cv2.boxFilter(guide * src, -1, k) - mean_i * mean_p
+    a = cov_ip / (var_i + eps)
+    b = mean_p - a * mean_i
+    return cv2.boxFilter(a, -1, k) * guide + cv2.boxFilter(b, -1, k)
+
+
+def refine_alpha(img, mask):
+    """Snap a coarse mask to the real edges of the photo (guided filter), clean specks, keep fine hair-like softness."""
     import cv2
     import numpy as np
-    from PIL import Image
+    gray = cv2.cvtColor(np.asarray(img.convert("RGB")), cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
     a = np.asarray(mask, dtype=np.float32) / 255.0
-    a = np.clip((a - 0.12) / 0.76, 0.0, 1.0)
+    r = max(3, int(0.006 * max(a.shape)))
+    a = np.clip(_guided_filter(gray, a, r, 1e-3), 0, 1)
+    a = np.clip((a - 0.22) / 0.56, 0.0, 1.0)
     solid = (a > 0.5).astype(np.uint8)
     n, labels, stats, _ = cv2.connectedComponentsWithStats(solid, 8)
     if n > 2:
-        min_area = 0.004 * solid.size
+        biggest = max(stats[i, cv2.CC_STAT_AREA] for i in range(1, n))
         for i in range(1, n):
-            if stats[i, cv2.CC_STAT_AREA] < min_area:
+            if stats[i, cv2.CC_STAT_AREA] < max(0.004 * solid.size, 0.02 * biggest):
                 a[labels == i] = 0.0
-    a = cv2.GaussianBlur(a, (0, 0), 0.9)
-    return Image.fromarray((np.clip(a, 0, 1) * 255).astype("uint8"), "L")
+    return cv2.GaussianBlur(a, (0, 0), 0.7)
+
+
+def decontaminate(img, alpha):
+    """Remove the old-background colour fringe from semi-transparent edge pixels."""
+    import cv2
+    import numpy as np
+    rgb = np.asarray(img.convert("RGB"), dtype=np.float32)
+    a3 = alpha[..., None]
+    num = cv2.GaussianBlur(rgb * a3, (0, 0), 2.5)
+    den = cv2.GaussianBlur(alpha, (0, 0), 2.5)[..., None]
+    est = num / np.maximum(den, 1e-3)
+    edge = ((alpha > 0.02) & (alpha < 0.98))[..., None]
+    return np.clip(np.where(edge, est, rgb), 0, 255).astype(np.uint8)
 
 
 def remove_background_bytes(data: bytes):
     """Return (png_bytes, method) where method is 'ai' or 'basic'."""
+    import numpy as np
     from PIL import Image, ImageOps
     try:
         img = Image.open(io.BytesIO(data)); img.load()
@@ -1467,16 +1565,55 @@ def remove_background_bytes(data: bytes):
             logger.exception("AI background removal failed; falling back")
     if mask is None:
         mask = grabcut_mask(img)
-    mask = refine_mask(mask)
-    rgba = img.convert("RGBA"); rgba.putalpha(mask)
-    buf = io.BytesIO(); rgba.save(buf, format="PNG", optimize=False, compress_level=3)
+    alpha = refine_alpha(img, mask)
+    share = float((alpha > 0.5).mean())
+    if method == "basic" and (share < 0.02 or share > 0.97):
+        raise InvalidUploadError("The AI engine is not ready, and the basic method could not find a clear subject in this image. "
+                                 "Please try again in a minute, or use the Simple method on a plain wall or sheet.")
+    rgb = decontaminate(img, alpha)
+    rgba = np.dstack([rgb, np.clip(alpha * 255.0, 0, 255).astype(np.uint8)])
+    buf = io.BytesIO(); Image.fromarray(rgba, "RGBA").save(buf, format="PNG", compress_level=3)
     return buf.getvalue(), method
+
+
+def _memory_mb():
+    try:
+        with open("/proc/self/status") as fh:
+            for line in fh:
+                if line.startswith("VmRSS:"):
+                    return round(int(line.split()[1]) / 1024)
+    except Exception:
+        pass
+    return None
+
+
+@app.get("/status")
+def status():
+    """Open this in a browser to see which features are ready. (Checks only look for installed packages; nothing heavy is loaded.)"""
+    import importlib.util
+
+    def installed(name):
+        try:
+            return importlib.util.find_spec(name) is not None
+        except Exception:
+            return False
+    return {
+        "background_ai": _bg_state["state"] if BG_ENABLED else "disabled",   # disabled | idle | loading | ready | failed
+        "background_enabled": BG_ENABLED,
+        "background_model": BG_MODEL,
+        "onnxruntime_installed": installed("onnxruntime"),
+        "opencv_installed": installed("cv2"),
+        "audio_converter_ready": bool(find_ffmpeg()),
+        "memory_mb": _memory_mb(),
+    }
 
 
 @app.post("/remove-bg")
 @limiter.limit("8/minute")
 async def remove_bg(request: Request, file: UploadFile = File(...)):
     """Cut the person/subject out of a photo and return a transparent PNG."""
+    if not BG_ENABLED:
+        raise HTTPException(status_code=503, detail="The AI background engine is not turned on for this server yet. Use the Simple method, or connect the separate AI service.")
     try:
         data = await read_upload(file)
         png, method = await run_in_threadpool(remove_background_bytes, data)

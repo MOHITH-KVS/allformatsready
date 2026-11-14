@@ -1,4 +1,7 @@
 const API_URL = "https://allformatsready.onrender.com";
+// Optional: address of a separate, more powerful background-removal service. Leave empty to use API_URL.
+const BG_API_URL = "";
+const BG_BASE = BG_API_URL || API_URL;
 const ALLOWED_FORMATS = ["JPG","PNG","WEBP","PDF","DOCX"];
 const CONVERT_TIMEOUT_MS = 120000;
 const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
@@ -910,7 +913,7 @@ function afrCelebrate(){
   const bgIn=$("bgInExt"), bgTol=$("bgTolExt"), bgSw=$("bgSwExt"), bgColor=$("bgColorExt"), bgCanvas=$("bgCanvasExt"), bgMsg=$("bgMsgExt"), btnBg=$("btnBgExt"), btnPng=$("btnBgPngExt"), btnJpg=$("btnBgJpgExt");
   let bgImg=null, bgFile=null, bgName="photo", bgCut=null, bgFill="transparent";
   const bgMode=$("bgModeExt"), bgTolRow=$("bgTolRowExt");
-  bgMode.addEventListener("change",()=>{ bgTolRow.hidden=bgMode.value!=="plain"; });
+  bgMode.addEventListener("change",()=>{ bgTolRow.hidden=bgMode.value!=="plain"; $("bgTryPlainExt").hidden=true; });
   function bgPlain(img,tol){
     const s=Math.min(1,1600/Math.max(img.width,img.height)), c=document.createElement("canvas"); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
     const x=c.getContext("2d",{willReadFrequently:true}); x.drawImage(img,0,0,c.width,c.height);
@@ -959,23 +962,53 @@ function afrCelebrate(){
     if(f.size>MAXB){ say(bgMsg,"File is larger than 10MB.","err"); bgIn.value=""; return; }
     try{ bgImg=await loadImg(f); bgFile=f; bgName=base(f.name); $("bgDropTextExt").textContent="🪄 "+f.name; btnBg.disabled=false; }catch(e){ say(bgMsg,e.message,"err"); }
   });
+  function bgDescribe(err){
+    if(err&&err.kind==="network") return "Can't reach the AI server. It may be asleep or restarting. Wait about a minute and try again.";
+    if(err&&err.kind==="missing") return "The AI server does not have the background feature yet. The backend needs the latest main.py and requirements.txt.";
+    return (err&&err.message)||"The AI server could not process this photo.";
+  }
   async function bgSmart(file){
-    const fd=new FormData(); fd.append("file",file);
-    const r=await fetch(`${API_URL}/remove-bg`,{method:"POST",body:fd});
-    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(typeof e.detail==="string"?e.detail:"The server could not process this photo."); }
+    const fd=new FormData(); fd.append("file",file); let r;
+    try{ r=await fetch(`${BG_BASE}/remove-bg`,{method:"POST",body:fd}); }catch(e){ const x=new Error("network"); x.kind="network"; throw x; }
+    if(r.status===404){ const x=new Error("missing"); x.kind="missing"; throw x; }
+    if(!r.ok){ const e=await r.json().catch(()=>({})); const x=new Error(typeof e.detail==="string"?e.detail:"The AI server could not process this photo."); x.kind="server"; throw x; }
     const method=r.headers.get("X-BG-Method")||"ai", img=await loadImg(await r.blob());
     const c=document.createElement("canvas"); c.width=img.width; c.height=img.height; c.getContext("2d").drawImage(img,0,0);
     return {canvas:c, method};
   }
+  const bgStatus=$("bgStatusExt");
+  async function bgCheckStatus(){
+    const set=(cls,t)=>{ bgStatus.className="bg-status-ext "+cls; bgStatus.textContent=t; };
+    set("","⏳ Checking the AI engine…");
+    try{
+      const r=await fetch(`${BG_BASE}/status`,{cache:"no-store"});
+      if(r.status===404){ set("warn","⚠️ This server is not updated with the background feature yet."); return; }
+      if(!r.ok) throw new Error("status");
+      const st=await r.json();
+      if(st.background_ai==="disabled"){
+        set("warn","ℹ️ The AI engine is not turned on yet, so the Simple method is selected for now.");
+        if(bgMode.value==="ai"){ bgMode.value="plain"; bgMode.dispatchEvent(new Event("change")); }
+        return;
+      }
+      if(st.onnxruntime_installed===false||st.opencv_installed===false) set("warn","⚠️ The server is missing its AI libraries (redeploy with the new requirements.txt).");
+      else if(st.background_ai==="ready") set("ok","✅ AI engine ready ("+(st.background_model||"model")+")");
+      else if(st.background_ai==="failed") set("warn","⚠️ The AI model could not load on the server. Tap to re-check.");
+      else set("","⏳ AI engine is warming up (about a minute after the server sleeps). Tap to re-check.");
+    }catch(e){ set("warn","⚠️ Can't reach the server. It may be asleep. Tap to re-check in a minute."); }
+  }
+  bgStatus.addEventListener("click",bgCheckStatus);
+  document.querySelector('.tl-tile[data-go="bgremove"]')?.addEventListener("click",()=>{ if(!bgStatus.dataset.done){ bgStatus.dataset.done="1"; bgCheckStatus(); } });
+  const bgTry=$("bgTryPlainExt");
+  bgTry.addEventListener("click",()=>{ bgMode.value="plain"; bgMode.dispatchEvent(new Event("change")); btnBg.click(); });
   btnBg.addEventListener("click",async()=>{
-    if(!bgImg) return; bgMsg.className="cs-msg"; btnBg.disabled=true; btnBg.classList.add("is-loading"); btnBg.textContent="Working…";
+    if(!bgImg) return; bgMsg.className="cs-msg"; bgTry.hidden=true; btnBg.disabled=true; btnBg.classList.add("is-loading"); btnBg.textContent="Working…";
     const host=btnBg.closest(".tool-section");
     if(bgMode.value==="ai") afrWorkStart(host,["Finding the person…","Cutting out the background…","Smoothing the edges…"]);
     try{
       let note="", good=true;
       if(bgMode.value==="ai"){
-        try{ const r=await bgSmart(bgFile); bgCut=r.canvas; if(r.method==="basic"){ note="The AI model was not ready on the server yet, so a basic cutout was used. Try again in a minute."; good=false; } }
-        catch(err){ const r=bgPlain(bgImg,+bgTol.value); bgCut=r.canvas; note="Could not reach the server, so the plain-background method was used."; good=false; }
+        try{ const r=await bgSmart(bgFile); bgCut=r.canvas; if(r.method==="basic"){ note="The AI model was not ready on the server yet, so a basic cutout was used. It can be wrong on busy pictures. Try again in a minute."; good=false; } }
+        catch(err){ bgCut=null; say(bgMsg,bgDescribe(err),"err"); bgTry.hidden=false; bgCheckStatus(); afrWorkStop(host); btnBg.disabled=false; btnBg.classList.remove("is-loading"); btnBg.textContent="Remove background →"; return; }
       } else {
         const r=bgPlain(bgImg,+bgTol.value); bgCut=r.canvas;
         if(r.share>0.97){ note="Almost the whole picture was removed. Lower the Sensitivity."; good=false; }

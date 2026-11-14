@@ -1,0 +1,5 @@
+# OPTIONAL: only install these if you set ENABLE_BG_AI=1 on a server with 2 GB+ of memory.
+# (On the free 512 MB Render plan the AI model makes the server run out of memory.)
+numpy==1.26.4
+onnxruntime==1.20.1
+opencv-python-headless==4.10.0.84

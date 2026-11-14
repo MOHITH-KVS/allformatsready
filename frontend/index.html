@@ -30,6 +30,9 @@
   <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://allformatsready.vercel.app/#org","name":"AllFormatsReady","url":"https://allformatsready.vercel.app/","alternateName":"All Formats Ready"},{"@type":"WebSite","@id":"https://allformatsready.vercel.app/#website","url":"https://allformatsready.vercel.app/","name":"AllFormatsReady","inLanguage":"en-IN","publisher":{"@id":"https://allformatsready.vercel.app/#org"},"alternateName":["All Formats Ready","allformatsready"]},{"@type":"WebApplication","@id":"https://allformatsready.vercel.app/#app","name":"AllFormatsReady","url":"https://allformatsready.vercel.app/","description":"AllFormatsReady (All Formats Ready): free Indian document converter. PDF to JPG, compress Aadhaar & PAN under 200KB, merge PDFs, resize photos to exact KB.","applicationCategory":"UtilitiesApplication","operatingSystem":"Any (web browser)","browserRequirements":"Requires JavaScript","inLanguage":"en-IN","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"publisher":{"@id":"https://allformatsready.vercel.app/#org"},"featureList":["Convert PDF, DOCX and images to PDF, JPG, PNG and WebP","Compress Aadhaar and PAN documents under 200KB","Merge PDF files","Extract, reorder, rotate and compress PDF pages","Resize photos and signatures to exact KB and pixel sizes","Passport photo generator (300 DPI)","Remove or replace photo backgrounds","Convert audio files (MP3, WAV, M4A, OGG, Opus, FLAC)"],"alternateName":["All Formats Ready","allformatsready"]},{"@type":"FAQPage","@id":"https://allformatsready.vercel.app/#faq","mainEntity":[{"@type":"Question","name":"How to compress Aadhaar PDF under 200KB for bank KYC?","acceptedAnswer":{"@type":"Answer","text":"Upload your Aadhaar PDF — you'll see a 'JPG under 200KB' card in the results. Click Download on just that file. No need to download everything else."}},{"@type":"Question","name":"How to convert Aadhaar card PDF to JPG online free?","acceptedAnswer":{"@type":"Answer","text":"Upload your Aadhaar PDF above. AllFormatsReady converts it to JPG in multiple sizes automatically — no sign-up, completely free."}},{"@type":"Question","name":"What is masked Aadhaar and why do portals ask for it?","acceptedAnswer":{"@type":"Answer","text":"For text-based PDFs, the converter can provide a verified masked output when an Aadhaar identifier is detected. It covers the first 8 digits and preserves only the last 4. Scanned PDFs are not OCR-redacted."}},{"@type":"Question","name":"Can I convert a multi-page PDF? Which pages are converted?","acceptedAnswer":{"@type":"Answer","text":"Yes! AllFormatsReady converts every page of your PDF. You'll see separate image cards for each page — Page 1, Page 2, etc. You can download them all as a combined DOCX or individually."}},{"@type":"Question","name":"Does it support HEIC files from iPhone?","acceptedAnswer":{"@type":"Answer","text":"Yes! HEIC and HEIF files from iPhone are fully supported. Upload your iPhone photo and get JPG, PNG, WebP, and PDF versions instantly."}},{"@type":"Question","name":"Can I upload multiple images at once?","acceptedAnswer":{"@type":"Answer","text":"Yes! Select multiple JPG/PNG images at once — you'll get individual formats for each image plus a combined PDF and combined DOCX with all images together."}},{"@type":"Question","name":"How do I create a passport photo online free?","acceptedAnswer":{"@type":"Answer","text":"Use the Passport Photo section on this page. Upload your photo, select your size (Indian Passport 35×45mm, Visa, College, JEE, NEET etc.), adjust the crop, choose background color, and download at 300 DPI quality."}},{"@type":"Question","name":"What is the Chrome Extension and how is it different?","acceptedAnswer":{"@type":"Answer","text":"The Chrome Extension lets you convert documents directly while filling any form — without switching tabs. It auto-detects 30 Indian portals (EPFO, HDFC, SBI, UIDAI, Naukri etc.) and shows the right format at the top. Download free from GitHub."}},{"@type":"Question","name":"Is my Aadhaar card safe to upload here?","acceptedAnswer":{"@type":"Answer","text":"Your file is processed on the server and sensitive-document handling is reported when the text layer can be verified. Scanned-image redaction is not supported. Server retention and deletion depend on the deployment and are not guaranteed by this page."}},{"@type":"Question","name":"Do I need to download everything as a ZIP?","acceptedAnswer":{"@type":"Answer","text":"No — that's the point! Each format has its own Download button. If you only need JPG under 200KB, download just that. ZIP is available if you want everything at once."}},{"@type":"Question","name":"Can I upload a Word document (DOCX)?","acceptedAnswer":{"@type":"Answer","text":"Yes. Upload a .docx file in the main converter and it is rendered to PDF first, then converted to every format. Layout is a best-effort rendering (text, tables, and embedded images), so complex designs may differ slightly from Word. Legacy .doc files are not supported; save them as .docx first. The PDF to Text tool accepts PDFs only."}},{"@type":"Question","name":"Is AllFormatsReady completely free? Any hidden charges?","acceptedAnswer":{"@type":"Answer","text":"100% free. No account, no sign-up, no credit card, no watermarks, no hidden charges. We plan to keep the core tool free forever."}}]}]}</script>
   <script defer>
   const API_URL = "https://allformatsready.onrender.com";
+  // Optional: address of a separate, more powerful background-removal service (see bg-space/README.md). Leave empty to use API_URL.
+  const BG_API_URL = "";
+  const BG_BASE = BG_API_URL || API_URL;
   const CONVERT_MAX_BYTES = 10 * 1024 * 1024;
   const MERGE_MAX_BYTES = 30 * 1024 * 1024;
 
@@ -156,7 +159,8 @@
       window.afrWorkStart && window.afrWorkStart(host, ["Finding the person…", "Cutting out the background…", "Smoothing the edges…"]);
       try {
         const fd = new FormData(); fd.append("file", ppOrigFile);
-        const res = await fetch(`${API_URL}/remove-bg`, { method: "POST", body: fd });
+        let res; try { res = await fetch(`${BG_BASE}/remove-bg`, { method: "POST", body: fd }); } catch(e){ throw new Error("Can't reach the AI server (it may be asleep). Try again in a minute."); }
+        if(res.status === 404) throw new Error("The AI server does not have this feature yet.");
         if(!res.ok){ const e = await res.json().catch(() => ({})); throw new Error(apiErrorMessage(e, "Could not remove the background.")); }
         const method = res.headers.get("X-BG-Method"), url = URL.createObjectURL(await res.blob()), img = new Image();
         await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
@@ -1246,6 +1250,11 @@ function de(){ ppDragging=false; }
       .hero-grid > .hg-upload .drop-formats{margin-top:10px}
     }
 
+    .bg-status{display:block;width:100%;text-align:left;border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-600);border-radius:8px;padding:7px 10px;font-size:.74rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+    .bg-status.ok{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+    .bg-status.warn{background:#FFF7ED;border-color:#FED7AA;color:#92400E}
+    .bg-status:hover{filter:brightness(.97)}
+
     /* Mask tool guidance */
     .mk-steps{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
     .mk-steps li{display:flex;align-items:center;gap:7px;font-size:.74rem;font-weight:600;color:var(--gray-600);background:var(--gray-50);border:1px solid var(--gray-200);border-radius:20px;padding:5px 11px}
@@ -1652,7 +1661,7 @@ function de(){ ppDragging=false; }
     <!-- Background Remover -->
     <div class="tool-card" id="bg-remover">
       <h3 class="tool-card-title">🪄 Background Remover</h3>
-      <div class="tool-card-desc">Remove or replace the background of a photo, for passport photos and ID forms. Smart mode uses our server; Plain mode stays on your device.</div>
+      <div class="tool-card-desc">Remove or replace the background of a photo, product or object. AI mode sends the picture to our server for processing; Simple mode stays on your device.</div>
       <div class="tool-aka">Also searched as: remove background from photo, remove bg, white background photo, transparent PNG.</div>
       <div class="tool-drop" id="bgDropZone">
         <input type="file" id="bgFileInput" aria-label="Choose a photo" accept="image/jpeg,image/png,image/webp"/>
@@ -1661,8 +1670,9 @@ function de(){ ppDragging=false; }
         <div class="tool-drop-sub">JPG, PNG, WebP · Max 10MB</div>
       </div>
       <label class="tf-field">Method
-        <select id="bgMode"><option value="ai">Smart AI: best for people (uses our server)</option><option value="plain">Plain background: wall or sheet (on your device)</option></select>
+        <select id="bgMode"><option value="ai">AI (recommended): people, products, animals, objects</option><option value="plain">Simple: plain wall or sheet (stays on your device)</option></select>
       </label>
+      <button type="button" class="bg-status" id="bgStatus" title="Click to re-check the AI engine">⏳ Checking the AI engine…</button>
       <label class="tf-field" id="bgTolRow" hidden>Sensitivity (higher removes more) <input type="range" id="bgTol" min="8" max="90" value="32"/></label>
       <div class="tf-field">New background
         <div class="bg-swatches" id="bgSwatches" role="group" aria-label="New background">
@@ -1674,6 +1684,7 @@ function de(){ ppDragging=false; }
         </div>
       </div>
       <div class="tf-warn" id="bgWarn"></div>
+      <button type="button" class="tf-btn tf-btn-accent" id="bgTryPlain" hidden>Use the Simple method instead</button>
       <div class="tool-result" id="bgResult">
         <canvas id="bgCanvas" class="bg-canvas" aria-label="Result preview"></canvas>
         <div class="tool-result-title">✅ Background removed</div>
@@ -3004,13 +3015,48 @@ function de(){ ppDragging=false; }
     x.putImageData(id, 0, 0);
     return {canvas: c, removedShare: removed / (w * h)};
   }
+  function bgDescribe(err){
+    if(err && err.kind === "network") return "Can't reach the AI server. It may be asleep or restarting. Wait about a minute and try again.";
+    if(err && err.kind === "missing") return "The AI server does not have the background feature yet. The backend needs the latest main.py and requirements.txt deployed.";
+    return (err && err.message) || "The AI server could not process this photo.";
+  }
   async function bgSmart(file){
-    const fd = new FormData(); fd.append("file", file);
-    const res = await fetch(`${API_URL}/remove-bg`, { method: "POST", body: fd });
-    if(!res.ok){ const e = await res.json().catch(() => ({})); throw new Error(apiErrorMessage(e, "The server could not process this photo.")); }
+    const fd = new FormData(); fd.append("file", file); let res;
+    try { res = await fetch(`${BG_BASE}/remove-bg`, { method: "POST", body: fd }); }
+    catch(e){ const x = new Error("network"); x.kind = "network"; throw x; }
+    if(res.status === 404){ const x = new Error("missing"); x.kind = "missing"; throw x; }
+    if(!res.ok){ const e = await res.json().catch(() => ({})); const x = new Error(apiErrorMessage(e, "The AI server could not process this photo.")); x.kind = "server"; throw x; }
     const method = res.headers.get("X-BG-Method") || "ai", img = await loadImage(await res.blob());
     return {canvas: bgScaled(img, 2000), method};
   }
+  async function bgCheckStatus(){
+    const el = $("bgStatus"); if(!el) return;
+    const set = (cls, text) => { el.className = "bg-status " + cls; el.textContent = text; };
+    set("", "⏳ Checking the AI engine…");
+    try {
+      const res = await fetch(`${BG_BASE}/status`, {cache: "no-store"});
+      if(res.status === 404){ set("warn", "⚠️ AI engine: this server is not updated with the background feature yet."); return; }
+      if(!res.ok) throw new Error("status");
+      const st = await res.json();
+      if(st.background_ai === "disabled"){
+        set("warn", "ℹ️ The AI engine is not turned on yet, so the Simple method (plain wall or sheet) is selected for now.");
+        if($("bgMode").value === "ai"){ $("bgMode").value = "plain"; $("bgMode").dispatchEvent(new Event("change")); }
+        return;
+      }
+      if(st.onnxruntime_installed === false || st.opencv_installed === false) set("warn", "⚠️ AI engine: the server is missing its AI libraries. Redeploy with the new requirements.txt.");
+      else if(st.background_ai === "ready") set("ok", "✅ AI engine ready (" + (st.background_model || "model") + ")");
+      else if(st.background_ai === "failed") set("warn", "⚠️ AI engine: the model could not load on the server. Click to re-check, or see the server logs.");
+      else set("", "⏳ AI engine is warming up. The first use after the server sleeps takes about a minute. Click to re-check.");
+    } catch(e){ set("warn", "⚠️ AI engine: can't reach the server. It may be asleep. Click to re-check in a minute."); }
+  }
+  (function(){
+    const el = $("bgStatus"); if(!el) return;
+    el.addEventListener("click", bgCheckStatus);
+    const card = $("bg-remover");
+    if("IntersectionObserver" in window && card){
+      const io = new IntersectionObserver(es => { if(es.some(x => x.isIntersecting)){ io.disconnect(); bgCheckStatus(); } }, {threshold: 0.2}); io.observe(card);
+    } else bgCheckStatus();
+  })();
   function bgCompose(forJpg){
     if(!bgCut) return null;
     const c = document.createElement("canvas"); c.width = bgCut.width; c.height = bgCut.height; const x = c.getContext("2d");
@@ -3022,7 +3068,8 @@ function de(){ ppDragging=false; }
     const c = bgCompose(false); if(!c) return;
     bgCanvas.width = c.width; bgCanvas.height = c.height; bgCanvas.getContext("2d").drawImage(c, 0, 0);
   }
-  bgMode.addEventListener("change", () => { bgTolRow.hidden = bgMode.value !== "plain"; });
+  bgMode.addEventListener("change", () => { bgTolRow.hidden = bgMode.value !== "plain"; $("bgTryPlain").hidden = true; });
+  $("bgTryPlain").addEventListener("click", () => { bgMode.value = "plain"; bgMode.dispatchEvent(new Event("change")); btnBg.click(); });
   bgSw.addEventListener("click", e => {
     const b = e.target.closest(".bg-sw"); if(!b) return;
     bgSw.querySelectorAll(".bg-sw").forEach(x => x.classList.toggle("active", x === b)); bgFill = b.dataset.fill; bgRender();
@@ -3040,17 +3087,17 @@ function de(){ ppDragging=false; }
   });
   btnBg.addEventListener("click", async () => {
     if(!bgImg) return;
-    showWarn(bgWarn, ""); bgResult.classList.remove("show"); btnBg.disabled = true; btnBg.textContent = "Working…";
+    showWarn(bgWarn, ""); $("bgTryPlain").hidden = true; bgResult.classList.remove("show"); btnBg.disabled = true; btnBg.textContent = "Working…";
     try {
       let note = "";
       if(bgMode.value === "ai"){
         window.afrWorkStart && window.afrWorkStart(bgResult.parentElement, ["Finding the person…", "Cutting out the background…", "Smoothing the edges…"]);
         try {
           const r = await bgSmart(bgFile); bgCut = r.canvas;
-          if(r.method === "basic") note = "The AI model was not ready on the server yet, so a basic cutout was used. Try again in a minute for cleaner edges.";
+          if(r.method === "basic") note = "The AI model was not ready on the server yet, so a basic cutout was used. It can be wrong on busy pictures. Try again in a minute for the full AI result.";
         } catch(err){
-          const r = bgPlain(bgImg, +bgTol.value); bgCut = r.canvas;
-          note = "The Smart method could not reach the server, so the plain-background method was used. It works best on a plain wall or sheet.";
+          bgCut = null; showWarn(bgWarn, bgDescribe(err)); $("bgTryPlain").hidden = false; bgCheckStatus();
+          btnBg.disabled = false; btnBg.textContent = "Remove background →"; return;
         }
       } else {
         const r = bgPlain(bgImg, +bgTol.value); bgCut = r.canvas;
